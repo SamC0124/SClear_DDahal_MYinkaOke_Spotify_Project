@@ -55,36 +55,32 @@ if __name__ == '__main__':
 
     unique_data["possible_groups"] = clusters.labels_
     print(unique_data.corr())
+    # Load data and drop rows with empty values
 
-    if __name__ == '__main__':
-        # Load data and drop rows with empty values
+    # print(data.describe())
 
-        # print(data.describe())
+    # Load data and drop unnecessary columns and rows with null values
+    data = pd.read_csv('data/song_data.csv').drop(columns=['track_id', 'key']).dropna()
 
-        # Load data and drop unnecessary columns and rows with null values
-        data = pd.read_csv('data/song_data.csv').drop(columns=['track_id', 'key']).dropna()
+    # Remove duplicates based on track name
+    data = data.drop_duplicates(subset=['track_name'])
 
-        # Remove duplicates based on track name
-        data = data.drop_duplicates(subset=['track_name'])
+    # Filter data with "popularity" greater than 75
+    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
+    * also if we want we can increase the number of popularity for better accuracy'''
 
-        # Filter data with "popularity" greater than 75
-        '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
-        * also if we want we can increase the number of popularity for better accuracy'''
+    data = data[data['popularity'] > 75]
 
-        data = data[data['popularity'] > 75]
+    # Calculate average of specified columns
+    '''using that data we find the average the durations_ms, danceability, 
+    energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
 
-        # Calculate average of specified columns
-        '''using that data we find the average the durations_ms, danceability, 
-        energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
+    average_data = data[['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']].mean()
 
-        average_data = data[['duration_ms', 'danceability', 'energy', 'loudness',
-                             'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
-                             'time_signature']].mean()
+    '''using the average we set the upper limit/threshold to predict the popularity of a song
+    * once our model is created we can see what features make the song popular 
+    * we would most likely need create some sort of classification to check the features '''
 
-        '''using the average we set the upper limit/threshold to predict the popularity of a song
-        * once our model is created we can see what features make the song popular 
-        * we would most likely need create some sort of classification to check the features '''
-
-        print(average_data)
+    print(average_data)
 
 
