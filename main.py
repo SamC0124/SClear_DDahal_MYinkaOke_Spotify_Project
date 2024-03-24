@@ -114,3 +114,41 @@ if __name__ == '__main__':
     plt.scatter(data=pop_data, x='tempo', y='popularity')
     plt.show()
     print(average_data)
+
+    # Additional Code from Diwas
+    '''using the average we can make model like linear regression, decision tree, or forest''' 
+    cleared_data = pd.read_csv('data/song_data.csv').drop(columns=['track_id', 'key']).dropna(how='any') 
+    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular') 
+    
+    # Convert True to 1 and False to 0 in the "popularity" column 
+    cleared_data['explicit'] = cleared_data['explicit'].astype(int) 
+    # Remove duplicates based on track name 
+    cleared_data = cleared_data.drop_duplicates(subset=['track_name']) 
+    # Convert milliseconds to seconds 
+    cleared_data['duration_s'] = cleared_data['duration_ms'] / 1000 
+
+    # List of columns you want to keep 
+    columns_to_keep = ['popularity','duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo'] 
+    columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature'] 
+    # Filtering columns 
+    cleared_data = cleared_data[columns_to_keep] 
+    # Reshape the data to long format 
+    long_data = pd.melt(cleared_data, id_vars=['popularity'], var_name='feature', value_name='value') 
+    # Calculate the mean for each feature and diagnosis 
+    means = long_data.groupby(['feature', 'popularity'])['value'].mean().reset_index() 
+    # Reshape the data back to wide format 
+    wide_means = means.pivot(index='feature', columns='popularity', values='value') 
+    # Print the result 
+    print(wide_means)
+    #Create a box plot 
+    sns.set(style="whitegrid") 
+    g = sns.FacetGrid(long_data, col='feature', col_wrap=2, margin_titles=True, xlim=(long_data['value'].min(), long_data['value'].max())) 
+    g.map(sns.boxplot, 'value', 'popularity', 'popularity', order=['popular', 'not_popular'], hue_order=['popular', 'not_popular'], palette={"popular": "tomato", "not_popular": "cyan"}) 
+    plt.title("") 
+    plt.xlabel("") 
+    plt.ylabel("") 
+    
+    # Remove the legend 
+    plt.legend().remove() 
+    plt.xlim(left=0, right=1)
+    plt.show()
