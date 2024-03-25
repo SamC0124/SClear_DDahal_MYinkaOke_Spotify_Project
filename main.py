@@ -15,6 +15,9 @@ import sklearn as sk
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_predict
+from sklearn.metrics import confusion_matrix, accuracy_score
 import os
 import time
 
@@ -115,7 +118,7 @@ if __name__ == '__main__':
     plt.show()
     print(average_data)
 
-    # Additional Code from Diwas
+    # Additional Code from Diwas representing the relationships between averages of features to high/low popularity
     '''using the average we can make model like linear regression, decision tree, or forest''' 
     cleared_data = pd.read_csv('data/song_data.csv').drop(columns=['track_id', 'key']).dropna(how='any') 
     cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular') 
@@ -140,7 +143,7 @@ if __name__ == '__main__':
     wide_means = means.pivot(index='feature', columns='popularity', values='value') 
     # Print the result 
     print(wide_means)
-    #Create a box plot 
+    # Create a box plot 
     sns.set(style="whitegrid") 
     g = sns.FacetGrid(long_data, col='feature', col_wrap=2, margin_titles=True, xlim=(long_data['value'].min(), long_data['value'].max())) 
     g.map(sns.boxplot, 'value', 'popularity', 'popularity', order=['popular', 'not_popular'], hue_order=['popular', 'not_popular'], palette={"popular": "tomato", "not_popular": "cyan"}) 
@@ -152,3 +155,64 @@ if __name__ == '__main__':
     plt.legend().remove() 
     plt.xlim(left=0, right=1)
     plt.show()
+
+    # Select numeric columns 
+    numeric_cols = cleared_data.select_dtypes(include='number') 
+    # Min-max normalization 
+    pop_norm = (numeric_cols - numeric_cols.min()) / (numeric_cols.max() - numeric_cols.min()) 
+    # Standardization 
+    pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std() 
+    # Create knn_results DataFrame 
+    knn_results = pd.DataFrame({ 'k': range(1, 6), 'pop_norm': [-1] * 5, 'pop_stan': [-1] * 5 }) 
+    # Displaying the knn_results DataFrame 
+    print(knn_results) 
+    # Convert 'pop_norm' and 'pop_stan' columns to float64 
+    knn_results['pop_norm'] = knn_results['pop_norm'].astype(float) 
+    knn_results['pop_stan'] = knn_results['pop_stan'].astype(float) 
+    # Fit KNN Algorithm for normalized data 
+    for i in range(len(knn_results)): 
+        knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k']) 
+        loop_knn = cross_val_predict(knn, pop_norm, cleared_data['popularity'], cv=5) 
+        loop_norm_cm = confusion_matrix(loop_knn, cleared_data['popularity']) 
+        accuracy = round(accuracy_score(loop_knn, cleared_data['popularity']), 2) 
+        print(f"Accuracy for k={knn_results.loc[i, 'k']} with normalized data: {accuracy}") 
+        
+        # Debugging print
+        knn_results.loc[i, 'pop_norm'] = accuracy 
+        # Fit KNN Algorithm for standardized data 
+        knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k']) 
+        loop_knn2 = cross_val_predict(knn, pop_stan, cleared_data['popularity'], cv=5) 
+        accuracy2 = round(accuracy_score(loop_knn2, cleared_data['popularity']), 2) 
+        print(f"Accuracy for k={knn_results.loc[i, 'k']} with standardized data: {accuracy2}") 
+        
+        # Debugging print 
+        knn_results.loc[i, 'pop_stan'] = accuracy2 
+        # Displaying the first 10 rows of knn_results DataFrame 
+        # print(knn_results.head(10)) 
+        # long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
+         
+        # # # Create the plot 
+        # plt.figure(figsize=(10, 6)) 
+        # sns.lineplot(data=long_knn_results, x='k', y='accuracy', hue='rescale_method') 
+        
+        # # # Set labels and title 
+        # plt.xlabel('Choice of K') # plt.ylabel('Accuracy') 
+        # plt.title('KNN Algorithm Performance') 
+        # plt.legend(title='Rescale Method', labels=['Normalized', 'Standardized']) 
+        
+        # # # Set scale for x-axis and y-axis # plt.xticks(range(1, 6)) 
+        # plt.yticks(np.arange(0.95, 1.0, 0.01), labels=[f'{i:.2f}%' for i in np.arange(0.95, 1.0, 0.01)]) 
+        
+        # # # Adjust legend position 
+        # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
+        
+        # # # Show plot 
+        # plt.grid(True) 
+        # plt.show() 
+        long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy') 
+        # Select the rows with the maximum accuracy for each rescale method 
+        max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()] 
+        print(max_accuracy_rows)
+
+    long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy') 
+    # Select the rows with the maximum accuracy for each rescale method max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()] print(max_accuracy_rows) # Ensure 'popularity' is included in pop_norm pop_norm['popularity'] = cleared_data['popularity'] # Splitting data into features (X) and target (y) X = pop_norm.drop(columns=['popularity']) # Exclude 'popularity' from features y = pop_norm['popularity'] # Use 'popularity' as the target column # Splitting data into train and test sets X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42) # Initializing KNN classifier knn_classifier = KNeighborsClassifier(n_neighbors=2) # Fitting the classifier on the training data knn_classifier.fit(X_train, y_train) # Predicting on the test data y_pred = knn_classifier.predict(X_test) # Calculating confusion matrix cm = confusion_matrix(y_test, y_pred) print(cm) # Displaying confusion matrix disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_) disp.plot()
