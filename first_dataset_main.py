@@ -36,7 +36,7 @@ import time
 #   to return songs that a person would actually like.
 
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
     music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
     # print(data.describe())
     print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
@@ -258,3 +258,4 @@ import time
     # Displaying confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
     disp.plot()
+

@@ -20,6 +20,8 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_predict, train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
+from sklearn.datasets import load_iris
+from sklearn import tree
 import time
 
 # Main function
@@ -37,6 +39,11 @@ import time
 
 
 if __name__ == '__main__':
+    # TODO: Feature Engineering
+    # TODO: Determine whether patterns can be predicted from the data, switch datasets if not.
+    # TODO: Implement the KNN Model on our Data
+    # TODO: Create Decision Tree Model
+
 
     ## Cleaning Data
     # Load Dataset
@@ -143,6 +150,32 @@ if __name__ == '__main__':
     pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std()
 
     print(f"Normalization of Population Results: {pop_norm}\nStandardization of the Population Results: {pop_stan}")
+
+    ## K-Means
+
+    ## Decision Tree Modeling
+    # First Decision Tree Model - All features
+    # This Decision Tree Classifier Program was adapted from the following site: https://scikit-learn.org/stable/modules/tree.html
+    print(cleared_data.columns)
+    X = cleared_data[columns_to_get_mean]
+    Y = cleared_data['popularity']
+    clf = tree.DecisionTreeClassifier(min_samples_split=20, max_leaf_nodes=25)
+    clf = clf.fit(X, Y)
+    print(tree.plot_tree(clf))
+
+    import graphviz
+
+    dot_data = tree.export_graphviz(clf, out_file=None)
+    graph = graphviz.Source(dot_data)
+    graph.render("spotify_pop_hyperparams_no_depth_1")
+    dot_data = tree.export_graphviz(clf, out_file=None,
+                                    feature_names=columns_to_get_mean,
+                                    class_names=['popular', 'not_popular'],
+                                    filled=True, rounded=True,
+                                    special_characters=True)
+    graph = graphviz.Source(dot_data)
+    graph
+    exit()
 
     ## KNN Modelling
     # Create knn_results DataFrame
@@ -254,12 +287,7 @@ if __name__ == '__main__':
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
     disp.plot()
 
-    # TODO: Feature Engineering
-    # TODO: Determine whether patterns can be predicted from the data, switch datasets if not.
-    # TODO: Implement the KNN Model on our Data
-    # TODO: Create Decision Tree Model
-
-
+    """
     # Could do an ensemble approach to compare the different models for a final project?
 
     # print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
@@ -335,23 +363,3 @@ if __name__ == '__main__':
     plt.scatter(data=pop_data, x='tempo', y='popularity')
     plt.show()
     print(average_data)
-
-    # Additional Code from Diwas representing the relationships between averages of features to high/low popularity
-    # # # Moved above
-"""
-
-"""
-    from sklearn.datasets import load_iris
-    from sklearn import tree
-
-    X = [[0, 0], [1, 1]]
-    Y = [0, 1]
-    clf = tree.DecisionTreeClassifier()
-    clf = clf.fit(X, Y)
-    clf.predict([[2., 2.]])
-    clf.predict_proba([[2., 2.]])
-    iris = load_iris()
-    X, y = iris.data, iris.target
-    clf = tree.DecisionTreeClassifier()
-    clf = clf.fit(X, y)
-    tree.plot_tree(clf) """
