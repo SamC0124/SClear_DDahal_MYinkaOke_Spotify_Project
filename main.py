@@ -6,9 +6,11 @@
 # used for running the main bulk of objects in the program.
 
 # Essential Packages for inspecting the data
-import pandas as pd
-import numpy as np
+import math
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
 import seaborn as sns
 import string
 import sklearn as sk
@@ -16,9 +18,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import confusion_matrix, accuracy_score
-import os
+from sklearn.model_selection import cross_val_predict, train_test_split
+from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
 import time
 
 # Main function
@@ -36,9 +37,232 @@ import time
 
 
 if __name__ == '__main__':
-    music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
-    # print(data.describe())
-    print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
+
+    ## Cleaning Data
+    # Load Dataset
+    music_data = pd.read_csv('data/Best_Songs_of_Spotify_from_2000-2023.csv', sep=";")
+
+    # Change Decibels to floating point numbers (Numbers represent power of 10)
+    music_data['dB'] = [math.pow(10, val) for val in music_data['dB']]
+
+    # Remove duplicate songs and NA values from the list
+    duplicates = music_data[music_data.duplicated('title')]
+    unique_data = music_data.drop_duplicates('title').dropna()
+
+    # Gathering Genre Data, plotting genre frequency for top-assigned genres of songs
+    music_data_genres = unique_data['top genre']
+
+    plt.figure(figsize=(12, 8))
+    sns.countplot(data=unique_data, x='top genre', order=unique_data['top genre'].value_counts().index, palette='rainbow')
+    plt.xlabel('Genre')
+    plt.ylabel('Count')
+    plt.title('Distribution of Songs by Genre')
+    plt.xticks(ticks=music_data_genres.values, rotation=90)
+    plt.tight_layout()
+    #plt.show()
+    plt.close()
+    print("Suprisingly, the top three genres of songs are the most prevalent in songs of this dataset. These genres are as follows:")
+    print(unique_data['top genre'].value_counts().head(5))
+
+    # Construct correlation matrix
+    fig, ax = plt.subplots()
+    corr_labels = list(unique_data.columns)
+
+    # Calculate data
+    corr = unique_data.corr()
+    print(corr.columns, unique_data.columns)
+
+    # Create the heatmap
+    cax = ax.matshow(corr, cmap='coolwarm')
+    fig.colorbar(cax)
+    ax.set_xticks(np.arange(len(unique_data.columns)))
+    ax.set_yticks(np.arange(len(unique_data.columns)))
+    ax.set_xticklabels(list(unique_data.columns))
+    ax.set_yticklabels(list(unique_data.columns))
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="left", rotation_mode="anchor")
+
+    # Show plot
+    # plt.show()
+    plt.close()
+
+    # If we make 5 clusters based on popularity, what characteristics are shared between songs in each group?
+    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
+    unique_data["popularity_groups"] = pop_clusters.labels_
+
+    plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
+    plt.show()
+
+    first_group = unique_data[unique_data["popularity_groups"] == 0]
+    second_group = unique_data[unique_data["popularity_groups"] == 1]
+    third_group = unique_data[unique_data["popularity_groups"] == 2]
+    fourth_group = unique_data[unique_data["popularity_groups"] == 3]
+    fifth_group = unique_data[unique_data["popularity_groups"] == 4]
+
+    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
+    ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
+    ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
+    ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
+    ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
+    ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
+    fig.tight_layout()
+    plt.show()
+
+    pop_data = unique_data[unique_data['popularity'] > 75]
+    average_data = pop_data[['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration', 'acousticness', 'speechiness', 'popularity']].mean()
+
+    # Scatterplots to represent possible trends in the data
+    plt.scatter(data=unique_data, x="dB", y="bpm")
+    plt.xlabel("Volume of Max Gain in Decibels For Song")
+    plt.ylabel("Tempo of the Song (bpm)")
+    plt.title("Wholesale Popularity by Variable Levels")
+    plt.show()
+    plt.close()
+
+    ## Standardization and Normalization
+
+    '''using the average we can make model like linear regression, decision tree, or forest'''
+    # List of columns you want to keep
+    columns_to_keep = ['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration', 'acousticness',
+                       'speechiness', 'popularity']
+    columns_to_get_mean = ['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration',
+                           'acousticness', 'speechiness']
+
+    # Create seperate dataset for modifying
+    cleared_data = unique_data[columns_to_keep]
+    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular')
+
+    print(f"Popularity Classes: Positive ({len(cleared_data[cleared_data['popularity'] == 'popular'])}), Negative ({len(cleared_data[cleared_data['popularity'] == 'not_popular'])})")
+
+    # Load data and drop unnecessary columns and rows with null values
+    # Normalized version of data
+    # Select numeric columns
+    numeric_cols = cleared_data.select_dtypes(include='number')
+    # Min-max normalization
+    pop_norm = (numeric_cols - numeric_cols.min()) / (numeric_cols.max() - numeric_cols.min())
+    # Standardization
+    pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std()
+
+    print(f"Normalization of Population Results: {pop_norm}\nStandardization of the Population Results: {pop_stan}")
+
+    ## KNN Modelling
+    # Create knn_results DataFrame
+    knn_results = pd.DataFrame({'k': range(1, 6), 'pop_norm': [-1] * 5, 'pop_stan': [-1] * 5})
+
+    # Convert 'pop_norm' and 'pop_stan' columns to float64
+    knn_results['pop_norm'] = knn_results['pop_norm'].astype(float)
+    knn_results['pop_stan'] = knn_results['pop_stan'].astype(float)
+
+    # Create knn_results DataFrame
+    knn_results = pd.DataFrame({'k': range(1, 6), 'pop_norm': [-1] * 5, 'pop_stan': [-1] * 5})
+    # Reshape the data to long format
+    long_data = pd.melt(cleared_data, id_vars=['popularity'], var_name='feature', value_name='value')
+    # Calculate the mean for each feature and diagnosis
+    means = long_data.groupby(['feature', 'popularity'])['value'].mean().reset_index()
+    # Reshape the data back to wide format
+    wide_means = means.pivot(index='feature', columns='popularity', values='value')
+    # Print the result
+    print(wide_means)
+    # Create a box plot
+    sns.set(style="whitegrid")
+    g = sns.FacetGrid(long_data, col='feature', col_wrap=2, margin_titles=True,
+                      xlim=(long_data['value'].min(), long_data['value'].max()))
+    g.map(sns.boxplot, 'value', 'popularity', 'popularity', order=['popular', 'not_popular'],
+          hue_order=['popular', 'not_popular'], palette={"popular": "tomato", "not_popular": "cyan"})
+    plt.title("")
+    plt.xlabel("")
+    plt.ylabel("")
+
+    # Remove the legend
+    plt.legend().remove()
+    plt.xlim(left=0, right=1)
+    plt.show()
+
+    # Displaying the knn_results DataFrame
+    print(knn_results)
+
+    # Fit KNN Algorithm for normalized data
+    for i in range(len(knn_results)):
+        knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k'])
+        loop_knn = cross_val_predict(knn, pop_norm, cleared_data['popularity'], cv=5)
+        loop_norm_cm = confusion_matrix(loop_knn, cleared_data['popularity'])
+        accuracy = round(accuracy_score(loop_knn, cleared_data['popularity']), 2)
+        print(f"Accuracy for k={knn_results.loc[i, 'k']} with normalized data: {accuracy}")
+
+        # Debugging print
+        knn_results.loc[i, 'pop_norm'] = accuracy
+        # Fit KNN Algorithm for standardized data
+        knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k'])
+        loop_knn2 = cross_val_predict(knn, pop_stan, cleared_data['popularity'], cv=5)
+        accuracy2 = round(accuracy_score(loop_knn2, cleared_data['popularity']), 2)
+        print(f"Accuracy for k={knn_results.loc[i, 'k']} with standardized data: {accuracy2}")
+
+        # Debugging print
+        knn_results.loc[i, 'pop_stan'] = accuracy2
+        # Displaying the first 10 rows of knn_results DataFrame
+        print(knn_results.head(10))
+        long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
+
+        # # Create the plot
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(data=long_knn_results, x='k', y='accuracy', hue='rescale_method')
+
+        # # Set labels and title
+        plt.xlabel('Choice of K')  # plt.ylabel('Accuracy')
+        plt.title('KNN Algorithm Performance')
+        plt.legend(title='Rescale Method', labels=['Normalized', 'Standardized'])
+
+        # # Set scale for x-axis and y-axis # plt.xticks(range(1, 6))
+        plt.yticks(np.arange(0.95, 1.0, 0.01), labels=[f'{i:.2f}%' for i in np.arange(0.95, 1.0, 0.01)])
+
+        ## Adjust legend position
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        # # # Show plot
+        # plt.grid(True)
+        # plt.show()
+        long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
+        # Select the rows with the maximum accuracy for each rescale method
+        max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()]
+        print(max_accuracy_rows)
+
+    long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
+
+    # Select the rows with the maximum accuracy for each rescale method
+    max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()]
+    print(max_accuracy_rows)
+
+    # Ensure 'popularity' is included in pop_norm
+    pop_norm['popularity'] = cleared_data['popularity']
+    # Splitting data into features (X) and target (y)
+    X = pop_norm.drop(columns=['popularity'])
+    # Use 'popularity' as the target column, exclude popularity from original features
+    y = pop_norm['popularity']
+
+    # Splitting data into train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Initializing KNN classifier
+    knn_classifier = KNeighborsClassifier(n_neighbors=2)
+    # Fitting the classifier on the training data
+    knn_classifier.fit(X_train, y_train)
+    # Predicting on the test data
+    y_pred = knn_classifier.predict(X_test)
+    # Calculating confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
+    # Displaying confusion matrix
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
+    disp.plot()
+
+    # TODO: Feature Engineering
+    # TODO: Determine whether patterns can be predicted from the data, switch datasets if not.
+    # TODO: Implement the KNN Model on our Data
+    # TODO: Create Decision Tree Model
+
+
+    # Could do an ensemble approach to compare the different models for a final project?
+
+    # print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
 
     # Between 1-3 different entries don't have an artist, album name, or track_name. Are these columns what we want to
     # use to evaluate the relationship between different characteristics in songs, Popularity, and Dancability?
@@ -46,39 +270,33 @@ if __name__ == '__main__':
     # overrepresented in the dataset, so we can just take unique values by track ID.
     # print(data.info())
 
-    # Load data and drop unnecessary columns and rows with null values
-    unique_data = music_data.drop(columns=['track_id', 'key']).dropna()
-
     # Code for Timer to Start and Stop Showing Plots: https://stackoverflow.com/questions/30364770/how-to-set-timeout-to-pyplot-show-in-matplotlib
     # def close_plot():
     #     plt.close()
     #     return
-    
+
     # Initializing timer
     # fig = plt.figure()
     # timer = fig.canvas.new_timer(interval=1000) # Figure waits 5000 millisecond before calling a callback event
     # timer.add_callback(close_plot)
 
-    # # Correlation Matrix for the data
-    # plt.imshow(unique_data.corr(), cmap="PuBu")
+    # # # Show plot for 5 seconds
+    # # # timer.start()
+    # # plt.show()
+    #
+    # # # Looking for relationship from clusters based on dancability, explicity, and instrumentalness.
+    # # clusters = KMeans(n_clusters=5, max_iter=1000, random_state=1).fit(unique_data[['danceability', 'explicit', 'instrumentalness']])
+    # # print(clusters.labels_)
+    # # unique_data["possible_groups"] = clusters.labels_
+    # # print(unique_data.corr())
+    # #
+    # # # If we make 4 clusters based on popularity, what characteristics are shared between songs in each group?
+    # # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
+    # # unique_data["popularity_groups"] = pop_clusters.labels_
+    #
+    # print(len(unique_data['popularity']), len(unique_data['valence']))
 
-    # # Show plot for 5 seconds
-    # # timer.start()
-    # plt.show()
-
-    # Looking for relationship from clusters based on dancability, explicity, and instrumentalness.
-    clusters = KMeans(n_clusters=5, max_iter=1000, random_state=1).fit(unique_data[['danceability', 'explicit', 'instrumentalness']])
-    print(clusters.labels_)
-    unique_data["possible_groups"] = clusters.labels_
-    print(unique_data.corr())
-
-    # If we make 4 clusters based on popularity, what characteristics are shared between songs in each group?
-    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
-    unique_data["popularity_groups"] = pop_clusters.labels_
-    print(len(unique_data['popularity']), len(unique_data['danceability']))
-
-    plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
-    plt.show()
+    """
 
     first_group = unique_data[unique_data["popularity_groups"] == 0]
     second_group = unique_data[unique_data["popularity_groups"] == 0]
@@ -119,100 +337,21 @@ if __name__ == '__main__':
     print(average_data)
 
     # Additional Code from Diwas representing the relationships between averages of features to high/low popularity
-    '''using the average we can make model like linear regression, decision tree, or forest''' 
-    cleared_data = pd.read_csv('data/song_data.csv').drop(columns=['track_id', 'key']).dropna(how='any') 
-    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular') 
-    
-    # Convert True to 1 and False to 0 in the "popularity" column 
-    cleared_data['explicit'] = cleared_data['explicit'].astype(int) 
-    # Remove duplicates based on track name 
-    cleared_data = cleared_data.drop_duplicates(subset=['track_name']) 
-    # Convert milliseconds to seconds 
-    cleared_data['duration_s'] = cleared_data['duration_ms'] / 1000 
+    # # # Moved above
+"""
 
-    # List of columns you want to keep 
-    columns_to_keep = ['popularity','duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo'] 
-    columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature'] 
-    # Filtering columns 
-    cleared_data = cleared_data[columns_to_keep] 
-    # Reshape the data to long format 
-    long_data = pd.melt(cleared_data, id_vars=['popularity'], var_name='feature', value_name='value') 
-    # Calculate the mean for each feature and diagnosis 
-    means = long_data.groupby(['feature', 'popularity'])['value'].mean().reset_index() 
-    # Reshape the data back to wide format 
-    wide_means = means.pivot(index='feature', columns='popularity', values='value') 
-    # Print the result 
-    print(wide_means)
-    # Create a box plot 
-    sns.set(style="whitegrid") 
-    g = sns.FacetGrid(long_data, col='feature', col_wrap=2, margin_titles=True, xlim=(long_data['value'].min(), long_data['value'].max())) 
-    g.map(sns.boxplot, 'value', 'popularity', 'popularity', order=['popular', 'not_popular'], hue_order=['popular', 'not_popular'], palette={"popular": "tomato", "not_popular": "cyan"}) 
-    plt.title("") 
-    plt.xlabel("") 
-    plt.ylabel("") 
-    
-    # Remove the legend 
-    plt.legend().remove() 
-    plt.xlim(left=0, right=1)
-    plt.show()
+"""
+    from sklearn.datasets import load_iris
+    from sklearn import tree
 
-    # Select numeric columns 
-    numeric_cols = cleared_data.select_dtypes(include='number') 
-    # Min-max normalization 
-    pop_norm = (numeric_cols - numeric_cols.min()) / (numeric_cols.max() - numeric_cols.min()) 
-    # Standardization 
-    pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std() 
-    # Create knn_results DataFrame 
-    knn_results = pd.DataFrame({ 'k': range(1, 6), 'pop_norm': [-1] * 5, 'pop_stan': [-1] * 5 }) 
-    # Displaying the knn_results DataFrame 
-    print(knn_results) 
-    # Convert 'pop_norm' and 'pop_stan' columns to float64 
-    knn_results['pop_norm'] = knn_results['pop_norm'].astype(float) 
-    knn_results['pop_stan'] = knn_results['pop_stan'].astype(float) 
-    # Fit KNN Algorithm for normalized data 
-    for i in range(len(knn_results)): 
-        knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k']) 
-        loop_knn = cross_val_predict(knn, pop_norm, cleared_data['popularity'], cv=5) 
-        loop_norm_cm = confusion_matrix(loop_knn, cleared_data['popularity']) 
-        accuracy = round(accuracy_score(loop_knn, cleared_data['popularity']), 2) 
-        print(f"Accuracy for k={knn_results.loc[i, 'k']} with normalized data: {accuracy}") 
-        
-        # Debugging print
-        knn_results.loc[i, 'pop_norm'] = accuracy 
-        # Fit KNN Algorithm for standardized data 
-        knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k']) 
-        loop_knn2 = cross_val_predict(knn, pop_stan, cleared_data['popularity'], cv=5) 
-        accuracy2 = round(accuracy_score(loop_knn2, cleared_data['popularity']), 2) 
-        print(f"Accuracy for k={knn_results.loc[i, 'k']} with standardized data: {accuracy2}") 
-        
-        # Debugging print 
-        knn_results.loc[i, 'pop_stan'] = accuracy2 
-        # Displaying the first 10 rows of knn_results DataFrame 
-        # print(knn_results.head(10)) 
-        # long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
-         
-        # # # Create the plot 
-        # plt.figure(figsize=(10, 6)) 
-        # sns.lineplot(data=long_knn_results, x='k', y='accuracy', hue='rescale_method') 
-        
-        # # # Set labels and title 
-        # plt.xlabel('Choice of K') # plt.ylabel('Accuracy') 
-        # plt.title('KNN Algorithm Performance') 
-        # plt.legend(title='Rescale Method', labels=['Normalized', 'Standardized']) 
-        
-        # # # Set scale for x-axis and y-axis # plt.xticks(range(1, 6)) 
-        # plt.yticks(np.arange(0.95, 1.0, 0.01), labels=[f'{i:.2f}%' for i in np.arange(0.95, 1.0, 0.01)]) 
-        
-        # # # Adjust legend position 
-        # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
-        
-        # # # Show plot 
-        # plt.grid(True) 
-        # plt.show() 
-        long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy') 
-        # Select the rows with the maximum accuracy for each rescale method 
-        max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()] 
-        print(max_accuracy_rows)
-
-    long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy') 
-    # Select the rows with the maximum accuracy for each rescale method max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()] print(max_accuracy_rows) # Ensure 'popularity' is included in pop_norm pop_norm['popularity'] = cleared_data['popularity'] # Splitting data into features (X) and target (y) X = pop_norm.drop(columns=['popularity']) # Exclude 'popularity' from features y = pop_norm['popularity'] # Use 'popularity' as the target column # Splitting data into train and test sets X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42) # Initializing KNN classifier knn_classifier = KNeighborsClassifier(n_neighbors=2) # Fitting the classifier on the training data knn_classifier.fit(X_train, y_train) # Predicting on the test data y_pred = knn_classifier.predict(X_test) # Calculating confusion matrix cm = confusion_matrix(y_test, y_pred) print(cm) # Displaying confusion matrix disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_) disp.plot()
+    X = [[0, 0], [1, 1]]
+    Y = [0, 1]
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(X, Y)
+    clf.predict([[2., 2.]])
+    clf.predict_proba([[2., 2.]])
+    iris = load_iris()
+    X, y = iris.data, iris.target
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(X, y)
+    tree.plot_tree(clf) """
