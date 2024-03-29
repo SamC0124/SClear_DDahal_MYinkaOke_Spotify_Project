@@ -38,7 +38,7 @@ import time
 #   to return songs that a person would actually like.
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     # TODO: Feature Engineering
     # TODO: Determine whether patterns can be predicted from the data, switch datasets if not.
     # TODO: Implement the KNN Model on our Data
@@ -92,28 +92,6 @@ if __name__ == '__main__':
     # plt.show()
     plt.close()
 
-    # If we make 5 clusters based on popularity, what characteristics are shared between songs in each group?
-    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
-    unique_data["popularity_groups"] = pop_clusters.labels_
-
-    plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
-    plt.show()
-
-    first_group = unique_data[unique_data["popularity_groups"] == 0]
-    second_group = unique_data[unique_data["popularity_groups"] == 1]
-    third_group = unique_data[unique_data["popularity_groups"] == 2]
-    fourth_group = unique_data[unique_data["popularity_groups"] == 3]
-    fifth_group = unique_data[unique_data["popularity_groups"] == 4]
-
-    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
-    ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
-    ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
-    ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
-    ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
-    ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
-    fig.tight_layout()
-    plt.show()
-
     pop_data = unique_data[unique_data['popularity'] > 75]
     average_data = pop_data[['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration', 'acousticness', 'speechiness', 'popularity']].mean()
 
@@ -152,6 +130,55 @@ if __name__ == '__main__':
     print(f"Normalization of Population Results: {pop_norm}\nStandardization of the Population Results: {pop_stan}")
 
     ## K-Means
+    # If we make 5 clusters based on popularity, what characteristics are shared between songs in each group?
+    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
+    unique_data["popularity_groups"] = pop_clusters.labels_
+
+    plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
+    plt.show()
+
+    first_group = unique_data[unique_data["popularity_groups"] == 0]
+    second_group = unique_data[unique_data["popularity_groups"] == 1]
+    third_group = unique_data[unique_data["popularity_groups"] == 2]
+    fourth_group = unique_data[unique_data["popularity_groups"] == 3]
+    fifth_group = unique_data[unique_data["popularity_groups"] == 4]
+
+    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
+    ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
+    ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
+    ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
+    ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
+    ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
+    fig.tight_layout()
+    plt.show()
+
+## SVM with Soft Margin (Allow for missclassificationat a low cost, essential for our imperfect dataset)
+    ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
+    from sklearn.svm import SVC
+    from sklearn.datasets import make_classification
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score
+
+    # Generate noisy data
+    X = cleared_data[columns_to_get_mean]
+    y = cleared_data['popularity']
+
+    # Split data into train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+
+    # Create SVM classifier with soft-margin (C=1)
+    svm_classifier = SVC(kernel='poly', degree=4, C=0.1)
+
+    # Train the classifier
+    svm_classifier.fit(X_train, y_train)
+
+    # Make predictions on test data
+    y_pred = svm_classifier.predict(X_test)
+
+    # Calculate accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    print("Accuracy:", accuracy)
+    exit()
 
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
@@ -174,8 +201,6 @@ if __name__ == '__main__':
                                     filled=True, rounded=True,
                                     special_characters=True)
     graph = graphviz.Source(dot_data)
-    graph
-    exit()
 
     ## KNN Modelling
     # Create knn_results DataFrame

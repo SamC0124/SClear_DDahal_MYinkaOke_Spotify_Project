@@ -21,6 +21,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_predict, train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
 import time
+from sklearn import tree
 
 # Main function
 # Questions we want to answer: What features are the most effective at predicting whether a song is popular on Spotify?
@@ -37,43 +38,112 @@ import time
 
 
 if __name__ == '__main__':
+
+    ## Data Cleaning
     music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
-    # print(data.describe())
+
+    # Load data and drop unnecessary columns and rows with null values
+    unique_data = music_data.drop(columns=['track_id', 'key']).dropna()
+
+    '''using the average we can make model like linear regression, decision tree, or forest'''
+    cleared_data = unique_data
+    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular')
+    print(len(cleared_data[cleared_data['popularity'] == 'popular']),
+          len(cleared_data[cleared_data['popularity'] == 'not_popular']))
+
+    # Convert True to 1 and False to 0 in the "popularity" column
+    cleared_data['explicit'] = cleared_data['explicit'].astype(int)
+    # Remove duplicates based on track name
+    cleared_data = cleared_data.drop_duplicates(subset=['track_name'])
+    # Convert milliseconds to seconds
+    cleared_data['duration_s'] = cleared_data['duration_ms'] / 1000
+
+    print(music_data.describe())
     print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
 
     # Between 1-3 different entries don't have an artist, album name, or track_name. Are these columns what we want to
     # use to evaluate the relationship between different characteristics in songs, Popularity, and Dancability?
     # Another thing to note is that some tracks are entered into the dataset more than once. These songs will be
     # overrepresented in the dataset, so we can just take unique values by track ID.
-    # print(data.info())
+    print(music_data.info())
 
-    # Load data and drop unnecessary columns and rows with null values
-    unique_data = music_data.drop(columns=['track_id', 'key']).dropna()
+    ## Prior Graphing, Gathering Insights
+    # Computing correlations of data with highest popularity value
+    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
+    * also if we want we can increase the number of popularity for better accuracy'''
+    pop_data = music_data[music_data['popularity'] > 75]
+    plt.imshow(pop_data.corr(), cmap="PuBu")
+    plt.xticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+               ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
+                'energy',
+                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
+                'time_signature', 'track_genre'], rotation=45)
+    plt.yticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+               ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
+                'energy',
+                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
+                'time_signature', 'track_genre'])
+    plt.title("Correlations between Characteristics of Songs with High Popularities")
+    plt.tight_layout()
+    plt.show()
 
-    # Code for Timer to Start and Stop Showing Plots: https://stackoverflow.com/questions/30364770/how-to-set-timeout-to-pyplot-show-in-matplotlib
-    # def close_plot():
-    #     plt.close()
-    #     return
+    # List of columns you want to keep
+    columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness',
+                       'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo']
+    columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness',
+                           'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
 
-    # Initializing timer
-    # fig = plt.figure()
-    # timer = fig.canvas.new_timer(interval=1000) # Figure waits 5000 millisecond before calling a callback event
-    # timer.add_callback(close_plot)
+    ## SVM with Soft Margin (Allow for missclassificationat a low cost, essential for our imperfect dataset)
+    ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
+    from sklearn.svm import SVC
+    from sklearn.datasets import make_classification
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score
 
-    # # Correlation Matrix for the data
-    # plt.imshow(unique_data.corr(), cmap="PuBu")
+    # Generate noisy data
+    X = cleared_data[columns_to_get_mean]
+    y = cleared_data['popularity']
 
-    # # Show plot for 5 seconds
-    # # timer.start()
-    # plt.show()
+    # Split data into train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
-    # Looking for relationship from clusters based on dancability, explicity, and instrumentalness.
-    clusters = KMeans(n_clusters=5, max_iter=1000, random_state=1).fit(
-        unique_data[['danceability', 'explicit', 'instrumentalness']])
-    unique_data["possible_groups"] = clusters.labels_
-    print(unique_data.corr())
+    # Create SVM classifier with soft-margin (C=1)
+    svm_classifier = SVC(kernel='poly', degree=4, C=0.1)
 
-    # If we make 5 clusters based on popularity, what characteristics are shared between songs in each group?
+    # Train the classifier
+    svm_classifier.fit(X_train, y_train)
+
+    # Make predictions on test data
+    y_pred = svm_classifier.predict(X_test)
+
+    # Calculate accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    print("Accuracy:", accuracy)
+    exit()
+
+    ## Decision Tree Modeling
+    # First Decision Tree Model - All features
+    # This Decision Tree Classifier Program was adapted from the following site: https://scikit-learn.org/stable/modules/tree.html
+    print(cleared_data.columns)
+    X = cleared_data[columns_to_get_mean]
+    Y = cleared_data['popularity']
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(X, Y)
+    print(tree.plot_tree(clf))
+
+    import graphviz
+
+    dot_data = tree.export_graphviz(clf, out_file=None)
+    graph = graphviz.Source(dot_data)
+    graph.render("spotify_pop_data1_no_lim")
+    dot_data = tree.export_graphviz(clf, out_file=None,
+                                    feature_names=columns_to_get_mean,
+                                    class_names=['popular', 'not_popular'],
+                                    filled=True, rounded=True,
+                                    special_characters=True)
+    graph = graphviz.Source(dot_data)
+
+    ## K-Means Clustering: Not Fit for Model
     pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
     unique_data["popularity_groups"] = pop_clusters.labels_
 
@@ -95,29 +165,11 @@ if __name__ == '__main__':
     fig.tight_layout()
     plt.show()
 
-    # Computing correlations of data with highest popularity value
-    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
-    * also if we want we can increase the number of popularity for better accuracy'''
-    pop_data = unique_data[unique_data['popularity'] > 75]
-    plt.imshow(pop_data.corr(), cmap="PuBu")
-    plt.xticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-               ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability', 'energy',
-                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
-                'time_signature', 'track_genre'], rotation=45)
-    plt.yticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-               ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability', 'energy',
-                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
-                'time_signature', 'track_genre'])
-    plt.title("Correlations between Characteristics of Songs with High Popularities")
-    plt.tight_layout()
-    plt.show()
-
     # Calculate average of specified columns
     '''using that data we find the average the durations_ms, danceability, 
     energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
 
-    average_data = pop_data[
-        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness',
+    average_data = pop_data[['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness',
          'valence', 'tempo', 'time_signature']].mean()
 
     '''using the average we set the upper limit/threshold to predict the popularity of a song
@@ -128,25 +180,7 @@ if __name__ == '__main__':
     plt.show()
     print(average_data)
 
-    # Additional Code from Diwas representing the relationships between averages of features to high/low popularity
-    '''using the average we can make model like linear regression, decision tree, or forest'''
-    cleared_data = pd.read_csv('data/song_data.csv').drop(columns=['track_id', 'key']).dropna(how='any')
-    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular')
-    print(len(cleared_data[cleared_data['popularity'] == 'popular']),
-          len(cleared_data[cleared_data['popularity'] == 'not_popular']))
-
-    # Convert True to 1 and False to 0 in the "popularity" column
-    cleared_data['explicit'] = cleared_data['explicit'].astype(int)
-    # Remove duplicates based on track name
-    cleared_data = cleared_data.drop_duplicates(subset=['track_name'])
-    # Convert milliseconds to seconds
-    cleared_data['duration_s'] = cleared_data['duration_ms'] / 1000
-
-    # List of columns you want to keep
-    columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness',
-                       'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo']
-    columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness',
-                           'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
+    ## K-Nearest-Neighbors: Fit adequately for model
     # Filtering columns
     cleared_data = cleared_data[columns_to_keep]
     # Reshape the data to long format
