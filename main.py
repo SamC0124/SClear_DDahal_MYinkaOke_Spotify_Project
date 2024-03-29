@@ -152,8 +152,8 @@ import time
     fig.tight_layout()
     plt.show()
 
-## SVM with Soft Margin (Allow for missclassificationat a low cost, essential for our imperfect dataset)
-    ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
+    ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
+    # With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
     from sklearn.svm import SVC
     from sklearn.datasets import make_classification
     from sklearn.model_selection import train_test_split
