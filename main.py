@@ -104,7 +104,6 @@ import time
     plt.close()
 
     ## Standardization and Normalization
-
     '''using the average we can make model like linear regression, decision tree, or forest'''
     # List of columns you want to keep
     columns_to_keep = ['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration', 'acousticness',
@@ -130,27 +129,27 @@ import time
     print(f"Normalization of Population Results: {pop_norm}\nStandardization of the Population Results: {pop_stan}")
 
     ## K-Means
-    # If we make 5 clusters based on popularity, what characteristics are shared between songs in each group?
-    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
-    unique_data["popularity_groups"] = pop_clusters.labels_
-
-    plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
-    plt.show()
-
-    first_group = unique_data[unique_data["popularity_groups"] == 0]
-    second_group = unique_data[unique_data["popularity_groups"] == 1]
-    third_group = unique_data[unique_data["popularity_groups"] == 2]
-    fourth_group = unique_data[unique_data["popularity_groups"] == 3]
-    fifth_group = unique_data[unique_data["popularity_groups"] == 4]
-
-    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
-    ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
-    ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
-    ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
-    ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
-    ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
-    fig.tight_layout()
-    plt.show()
+    # # If we make 5 clusters based on popularity, what characteristics are shared between songs in each group?
+    # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['valance', 'danceability']])
+    # unique_data["popularity_groups"] = pop_clusters.labels_
+    #
+    # plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
+    # plt.show()
+    #
+    # first_group = unique_data[unique_data["popularity_groups"] == 0]
+    # second_group = unique_data[unique_data["popularity_groups"] == 1]
+    # third_group = unique_data[unique_data["popularity_groups"] == 2]
+    # fourth_group = unique_data[unique_data["popularity_groups"] == 3]
+    # fifth_group = unique_data[unique_data["popularity_groups"] == 4]
+    #
+    # fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
+    # ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
+    # fig.tight_layout()
+    # plt.show()
 
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
     # With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
@@ -178,7 +177,6 @@ import time
     # Calculate accuracy
     accuracy = accuracy_score(y_test, y_pred)
     print("Accuracy:", accuracy)
-    exit()
 
     ## Decision Tree Modeling
     # First Decision Tree Model - All features

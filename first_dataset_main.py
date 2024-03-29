@@ -20,6 +20,10 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_predict, train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
+from sklearn.svm import SVC
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 import time
 from sklearn import tree
 
@@ -41,6 +45,13 @@ if __name__ == '__main__':
 
     ## Data Cleaning
     music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
+
+    # Try removing all popularity values that are equal to zero
+    music_data = music_data[music_data['popularity'] > 0]
+
+    cont_pop_data = music_data.drop_duplicates(subset=['track_name'])
+    cont_pop_data['duration_s'] = cont_pop_data['duration_ms'] / 1000
+    cont_pop_data = cont_pop_data.drop(columns=['track_id', 'key']).dropna()
 
     # Load data and drop unnecessary columns and rows with null values
     unique_data = music_data.drop(columns=['track_id', 'key']).dropna()
@@ -95,11 +106,6 @@ if __name__ == '__main__':
 
     ## SVM with Soft Margin (Allow for missclassificationat a low cost, essential for our imperfect dataset)
     ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
-    from sklearn.svm import SVC
-    from sklearn.datasets import make_classification
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import accuracy_score
-
     # Generate noisy data
     X = cleared_data[columns_to_get_mean]
     y = cleared_data['popularity']
@@ -108,7 +114,7 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
     # Create SVM classifier with soft-margin (C=1)
-    svm_classifier = SVC(kernel='poly', degree=4, C=0.1)
+    svm_classifier = SVC(kernel='poly', degree=3, C=1)
 
     # Train the classifier
     svm_classifier.fit(X_train, y_train)
@@ -119,7 +125,6 @@ if __name__ == '__main__':
     # Calculate accuracy
     accuracy = accuracy_score(y_test, y_pred)
     print("Accuracy:", accuracy)
-    exit()
 
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
@@ -144,17 +149,17 @@ if __name__ == '__main__':
     graph = graphviz.Source(dot_data)
 
     ## K-Means Clustering: Not Fit for Model
-    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(unique_data[['popularity', 'danceability']])
-    unique_data["popularity_groups"] = pop_clusters.labels_
+    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
+    cont_pop_data["popularity_groups"] = pop_clusters.labels_
 
     plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
     plt.show()
 
-    first_group = unique_data[unique_data["popularity_groups"] == 0]
-    second_group = unique_data[unique_data["popularity_groups"] == 1]
-    third_group = unique_data[unique_data["popularity_groups"] == 2]
-    fourth_group = unique_data[unique_data["popularity_groups"] == 3]
-    fifth_group = unique_data[unique_data["popularity_groups"] == 4]
+    first_group = cont_pop_data[cont_pop_data["popularity_groups"] == 0]
+    second_group = cont_pop_data[cont_pop_data["popularity_groups"] == 1]
+    third_group = cont_pop_data[cont_pop_data["popularity_groups"] == 2]
+    fourth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 3]
+    fifth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 4]
 
     fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
     ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
@@ -213,7 +218,7 @@ if __name__ == '__main__':
     # Standardization
     pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std()
     # Create knn_results DataFrame
-    knn_results = pd.DataFrame({'k': range(1, 6), 'pop_norm': [-1] * 5, 'pop_stan': [-1] * 5})
+    knn_results = pd.DataFrame({'k': range(1, 11), 'pop_norm': [-1] * 10, 'pop_stan': [-1] * 10})
     # Displaying the knn_results DataFrame
     print(knn_results)
     # Convert 'pop_norm' and 'pop_stan' columns to float64
