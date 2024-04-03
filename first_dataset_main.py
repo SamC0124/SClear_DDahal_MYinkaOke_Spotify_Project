@@ -14,7 +14,7 @@ import pandas as pd
 import seaborn as sns
 import string
 import sklearn as sk
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
@@ -41,16 +41,26 @@ from sklearn import tree
 #   to return songs that a person would actually like.
 
 
-if __name__ == '__main__':
+# Function for collecting the false positives and the true positives from a classifiers confusion matrix.
+# Input: Two lists for actual and predicted values.
+# Output: Two totals for number of True positives and False positives.
+def retrieve_positive_classifications(p_y_test, p_y_pred):
+    conf_matrix = confusion_matrix(p_y_test, p_y_pred)
+    true_positive = conf_matrix[0][0]
+    false_positive = conf_matrix[0][1]
+    return true_positive, false_positive
 
+
+if __name__ == '__main__':
     ## Data Cleaning
     music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
 
-    # Try removing all popularity values that are equal to zero
+    # Try removing all popularity values that are equal to zero. These songs may have never been evaluated, which may
+    # misrepresent the true metrics of an unpopular song.
     music_data = music_data[music_data['popularity'] > 0]
 
     cont_pop_data = music_data.drop_duplicates(subset=['track_name'])
-    cont_pop_data['duration_s'] = cont_pop_data['duration_ms'] / 1000
+    cont_pop_data.loc[:, 'duration_s'] = cont_pop_data['duration_ms'] / 1000
     cont_pop_data = cont_pop_data.drop(columns=['track_id', 'key']).dropna()
 
     # Load data and drop unnecessary columns and rows with null values
@@ -72,6 +82,12 @@ if __name__ == '__main__':
     print(music_data.describe())
     print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
 
+    # List of columns you want to keep (Including Key)
+    columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
+                       'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
+    columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
+                           'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
+
     # Between 1-3 different entries don't have an artist, album name, or track_name. Are these columns what we want to
     # use to evaluate the relationship between different characteristics in songs, Popularity, and Dancability?
     # Another thing to note is that some tracks are entered into the dataset more than once. These songs will be
@@ -83,53 +99,115 @@ if __name__ == '__main__':
     '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
     * also if we want we can increase the number of popularity for better accuracy'''
     pop_data = music_data[music_data['popularity'] > 75]
+    pop_columns = ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability', 'energy',
+                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
+                'time_signature', 'track_genre']
     plt.imshow(pop_data.corr(), cmap="PuBu")
-    plt.xticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-               ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
-                'energy',
-                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
-                'time_signature', 'track_genre'], rotation=45)
-    plt.yticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-               ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
-                'energy',
-                'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
-                'time_signature', 'track_genre'])
+    plt.xticks(ticks=range(len(pop_columns)), labels=pop_columns, rotation=90)
+    plt.yticks(ticks=range(len(pop_columns)), labels=pop_columns)
     plt.title("Correlations between Characteristics of Songs with High Popularities")
     plt.tight_layout()
-    plt.show()
+    plt.colorbar()
+    plt.close()
 
-    # List of columns you want to keep
-    columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness',
-                       'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo']
-    columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'loudness', 'speechiness',
-                           'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
-
-    ## SVM with Soft Margin (Allow for missclassificationat a low cost, essential for our imperfect dataset)
+    ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
     ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
     # Generate noisy data
-    X = cleared_data[columns_to_get_mean]
-    y = cleared_data['popularity']
+    X = cleared_data[columns_to_keep][0:10000]
+    y = cleared_data['popularity'][0:10000]
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
     # Create SVM classifier with soft-margin (C=1)
-    svm_classifier = SVC(kernel='poly', degree=3, C=1)
+    # Measure differences in SVM Accuracy by kernel
+    print("Creating Classifiers...")
+    svm_classifier_linear = SVC(kernel='linear', degree=3, C=1, random_state=1)
+    svm_classifier_sgd = SGDClassifier(max_iter=2500, random_state=1)
+    svm_classifier_poly = SVC(kernel='poly', degree=3, C=1, random_state=1)
+    svm_classifier_sigmoid = SVC(kernel='sigmoid', degree=3, C=1, random_state=1)
+    svm_classifier_rbf = SVC(degree=3, C=1, random_state=1)
 
-    # Train the classifier
-    svm_classifier.fit(X_train, y_train)
+    # Train the classifiers
+    print("Training Classifiers...")
+    svm_classifier_linear.fit(X_train, y_train)
+    svm_classifier_sgd.fit(X_train, y_train)
+    svm_classifier_poly.fit(X_train, y_train)
+    svm_classifier_sigmoid.fit(X_train, y_train)
+    svm_classifier_rbf.fit(X_train, y_train)
 
     # Make predictions on test data
-    y_pred = svm_classifier.predict(X_test)
+    print("Classifying unseen data based on trained classifiers...")
+    y_pred_linear = svm_classifier_linear.predict(X_test)
+    y_pred_sdg = svm_classifier_sgd.predict(X_test)
+    y_pred_poly = svm_classifier_poly.predict(X_test)
+    y_pred_sigmoid = svm_classifier_sigmoid.predict(X_test)
+    y_pred_rbf = svm_classifier_rbf.predict(X_test)
 
+    # Calculate accuracy of each model
+    print("Processing the accuracy of each classifier, compared to actual data values...")
+    accuracy_linear = accuracy_score(y_test, y_pred_linear)
+    accuracy_sgd = accuracy_score(y_test, y_pred_sdg)
+    accuracy_poly = accuracy_score(y_test, y_pred_poly)
+    accuracy_sigmoid = accuracy_score(y_test, y_pred_sigmoid)
+    accuracy_rbf = accuracy_score(y_test, y_pred_rbf)
+
+    print("Model Accuracy by Kernel/Method")
+    print(f"Linear Kernel: {accuracy_linear}")
+    print(f"Linear SGD Kernel: {accuracy_sgd}")
+    print(f"Polynomial Kernel: {accuracy_poly}")
+    print(f"Sigmoid Kernel: {accuracy_sigmoid}")
+    print(f"RBF Kernel: {accuracy_rbf}")
+    exit()
+
+    # What classification errors were made in each type of model? Collect true positives against false positives for each type of kernel
+    svc_linear_true_positive, svc_linear_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+    svc_sgd_true_positive, svc_sgd_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+    svc_poly_true_positive, svc_poly_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+    svc_sigmoid_true_positive, svc_sigmoid_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+    svc_rbf_true_positive, svc_rbf_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+
+    # Comparing TP/FP on Two-layer Bar Plot
+    plt.hist(type='bar')
+    plt.xlabel("Kernel Type for SVC, divided by TP and FP Totals")
+    plt.ylabel("Totals Correct/Incorrect Classifications")
+    plt.title("Comparing Kernel Classifications by True/False Positive Totals")
+
+    # What are the equations computing popularity from the two highest support vectors (values of each feature)?
+    most_significant_vector = svm_classifier_poly.support_vectors[0]
+    second_most_significant_vector = svm_classifier_poly.support_vectors[1]
+
+    # Currently the accuracy for the model is extremely high, but we don't know why.
+    # What can we do to evaluate whether the model has not overfit the data or not?
+    # How can we view how effectively the model has classified the data?
+    print(svm_classifier_poly.n_features_in_)
+    print(svm_classifier_poly.support_vectors_)
+    plt.imshow(svm_classifier_poly.support_vectors_)
+    plt.title("Support vector ")
     # Calculate accuracy
     accuracy = accuracy_score(y_test, y_pred)
     print("Accuracy:", accuracy)
 
+    # Calculate average of specified columns
+    '''using that data we find the average the durations_ms, danceability, 
+    energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
+
+    average_data = pop_data[
+        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
+         'liveness',
+         'valence', 'tempo', 'time_signature']].mean()
+
+    '''using the average we set the upper limit/threshold to predict the popularity of a song
+    * once our model is created we can see what features make the song popular 
+    * we would most likely need create some sort of classification to check the features '''
+
+    plt.scatter(data=pop_data, x='tempo', y='popularity')
+    plt.show()
+    print(average_data)
+
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
     # This Decision Tree Classifier Program was adapted from the following site: https://scikit-learn.org/stable/modules/tree.html
-    print(cleared_data.columns)
     X = cleared_data[columns_to_get_mean]
     Y = cleared_data['popularity']
     clf = tree.DecisionTreeClassifier()
@@ -149,41 +227,26 @@ if __name__ == '__main__':
     graph = graphviz.Source(dot_data)
 
     ## K-Means Clustering: Not Fit for Model
-    pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
-    cont_pop_data["popularity_groups"] = pop_clusters.labels_
-
-    plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
-    plt.show()
-
-    first_group = cont_pop_data[cont_pop_data["popularity_groups"] == 0]
-    second_group = cont_pop_data[cont_pop_data["popularity_groups"] == 1]
-    third_group = cont_pop_data[cont_pop_data["popularity_groups"] == 2]
-    fourth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 3]
-    fifth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 4]
-
-    fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
-    ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
-    ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
-    ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
-    ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
-    ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
-    fig.tight_layout()
-    plt.show()
-
-    # Calculate average of specified columns
-    '''using that data we find the average the durations_ms, danceability, 
-    energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
-
-    average_data = pop_data[['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness', 'liveness',
-         'valence', 'tempo', 'time_signature']].mean()
-
-    '''using the average we set the upper limit/threshold to predict the popularity of a song
-    * once our model is created we can see what features make the song popular 
-    * we would most likely need create some sort of classification to check the features '''
-
-    plt.scatter(data=pop_data, x='tempo', y='popularity')
-    plt.show()
-    print(average_data)
+    # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
+    # cont_pop_data["popularity_groups"] = pop_clusters.labels_
+    #
+    # plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
+    # plt.show()
+    #
+    # first_group = cont_pop_data[cont_pop_data["popularity_groups"] == 0]
+    # second_group = cont_pop_data[cont_pop_data["popularity_groups"] == 1]
+    # third_group = cont_pop_data[cont_pop_data["popularity_groups"] == 2]
+    # fourth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 3]
+    # fifth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 4]
+    #
+    # fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
+    # ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
+    # ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
+    # fig.tight_layout()
+    # plt.show()
 
     ## K-Nearest-Neighbors: Fit adequately for model
     # Filtering columns
@@ -218,7 +281,7 @@ if __name__ == '__main__':
     # Standardization
     pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std()
     # Create knn_results DataFrame
-    knn_results = pd.DataFrame({'k': range(1, 11), 'pop_norm': [-1] * 10, 'pop_stan': [-1] * 10})
+    knn_results = pd.DataFrame({'k': range(1, 6), 'pop_norm': [-1] * 5, 'pop_stan': [-1] * 5})
     # Displaying the knn_results DataFrame
     print(knn_results)
     # Convert 'pop_norm' and 'pop_stan' columns to float64
@@ -297,4 +360,3 @@ if __name__ == '__main__':
     # Displaying confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
     disp.plot()
-
