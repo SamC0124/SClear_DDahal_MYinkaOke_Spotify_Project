@@ -2,7 +2,7 @@
 # Creators: Michael Yinka'Oke, Sam Clear, Diwas Dahal
 # Start Date: March 21st, 2024
 
-# This file currently acts as the main dataset inspecting file of the program, but will in the future just be
+# This file currently acts as the main dataset inspecting file of the program, but will eventually just be
 # used for running the main bulk of objects in the program.
 
 # Essential Packages for inspecting the data
@@ -71,10 +71,13 @@ if __name__ == '__main__':
 
     cont_pop_data = music_data.drop_duplicates(subset=['track_name'])
     cont_pop_data.loc[:, 'duration_s'] = cont_pop_data.loc[:, 'duration_ms'] / 1000
-    cont_pop_data = cont_pop_data.drop(columns=['track_id', 'key']).dropna()
+    cont_pop_data = cont_pop_data.drop(columns=['track_id', 'artists', 'album_name', 'track_name']).dropna()
+
+    # Remove duplicates based on track name
+    music_data = music_data.drop_duplicates(subset=['track_name'])
 
     # Load data and drop unnecessary columns and rows with null values
-    unique_data = music_data.drop(columns=['track_id']).dropna()
+    unique_data = music_data.drop(columns=['track_id', 'artists', 'album_name', 'track_name', 'track_genre']).dropna()
 
     # Binarizing popularity in the dataset (Song is popular or '1' if popularity > 75, else song is labeled '0')
     cleared_data = unique_data
@@ -82,8 +85,7 @@ if __name__ == '__main__':
 
     # Convert True to 1 and False to 0 in the "popularity" column
     cleared_data['explicit'] = cleared_data['explicit'].astype(int)
-    # Remove duplicates based on track name
-    cleared_data = cleared_data.drop_duplicates(subset=['track_name'])
+
     # Convert milliseconds to seconds
     cleared_data = cleared_data.rename(columns={'duration_ms': 'duration_s'})
     cleared_data.loc[:, 'duration_s'] = cleared_data.loc[:, 'duration_s'] / 1000
@@ -91,24 +93,25 @@ if __name__ == '__main__':
     print(f"Data Classified as \"Popular\": {len(cleared_data[cleared_data['popularity'] == 1])}\nData Classified as \"Non-Popular\" {len(cleared_data[cleared_data['popularity'] == 0])}")
     print("There is an extreme class imbalance for the positive class against the negative class. This should be addressed with an undersampling of the negative class data.")
 
-    # Undersampling the negative class for the data
-    undersampled_negative_class = cleared_data[cleared_data['popularity'] == 0].to_numpy().tolist()
-    undersampled_negative_class = random.sample(population=undersampled_negative_class, k=len(cleared_data[cleared_data['popularity'] == 1]))
-    print(len(undersampled_negative_class), len(cleared_data[cleared_data['popularity'] == 1]))
-    print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'")
-
-    # Placing back into a pandas dataframe
-    undersampled_data = np.concatenate([undersampled_negative_class, cleared_data[cleared_data['popularity'] == 1].to_numpy()])
-    undersampled_dataframe = pd.DataFrame(undersampled_data, columns=cleared_data.columns)
-
     # List of columns you want to keep (Including Key)
-    columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
+    columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'key', 'loudness', 'mode',
+                       'speechiness',
                        'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
     columns_to_get_mean = ['duration_s', 'explicit', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
                            'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'time_signature']
 
+    # Under-sampling the negative class for the data, picking from equal portions of the data throughout.
+    floor_divisor = len(cleared_data[cleared_data['popularity'] == 0]) // len(cleared_data[cleared_data['popularity'] == 1])
+    current_new_data = []
+    for i in range(len(cleared_data[cleared_data["popularity"] == 1])):
+        current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[i * floor_divisor])
+    undersampled_dataframe = pd.DataFrame(data=current_new_data, columns=columns_to_keep)
+
+    all_data = undersampled_dataframe.append(cleared_data[cleared_data['popularity'] == 1])
+    print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'.")
+
     ## Prior Graphing, Gathering Insights
-    # Computing correlations of data with highest popularity value
+    # Computing correlations of data with the highest popularity value
     '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
     * also if we want we can increase the number of popularity for better accuracy'''
     pop_data = music_data[music_data['popularity'] > 75]
@@ -121,25 +124,16 @@ if __name__ == '__main__':
     plt.title("Correlations between Characteristics of Songs with High Popularities")
     plt.tight_layout()
     plt.colorbar()
-    plt.close()
+    plt.show()
 
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
     ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
     # Collect portion of dataset for X (features to gauge popularity by) and Y (popularity classification
-    X = undersampled_dataframe[columns_to_get_mean]
-    y = undersampled_dataframe['popularity']
+    X = all_data[columns_to_get_mean]
+    y = all_data['popularity']
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
-    print(X_train.shape, y_train.shape)
-
-    # Collect portion of dataset for X (features to gauge popularity by) and Y (popularity classification
-    X_old = cleared_data[columns_to_get_mean]
-    y_old = cleared_data['popularity']
-
-    # Split data into train and test sets
-    X_train_old, X_test_old, y_train_old, y_test_old = train_test_split(X_old, y_old, test_size=0.2, random_state=0)
-    print(X_train_old.shape, y_train_old.shape)
 
     # Create SVM classifier with soft-margin (C=1)
     # Measure differences in SVM Accuracy by kernel
@@ -183,16 +177,16 @@ if __name__ == '__main__':
 
     # What classification errors were made in each type of model? Collect true positives against false positives for each type of kernel
     svc_linear_true_positive, svc_linear_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
-    svc_sgd_true_positive, svc_sgd_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
-    svc_poly_true_positive, svc_poly_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
-    svc_sigmoid_true_positive, svc_sigmoid_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
-    svc_rbf_true_positive, svc_rbf_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+    svc_sgd_true_positive, svc_sgd_false_positive = retrieve_positive_classifications(y_test, y_pred_sdg)
+    svc_poly_true_positive, svc_poly_false_positive = retrieve_positive_classifications(y_test, y_pred_poly)
+    svc_sigmoid_true_positive, svc_sigmoid_false_positive = retrieve_positive_classifications(y_test, y_pred_poly)
+    svc_rbf_true_positive, svc_rbf_false_positive = retrieve_positive_classifications(y_test, y_pred_rbf)
 
-    positive_class_data = pd.DataFrame({"Kernel Type": ["Linear", "Linear SGD", "Polynomial", "Sigmoid", "RBF"],
-                                        "True Positive": [svc_linear_true_positive, svc_sgd_true_positive, svc_poly_true_positive, svc_sigmoid_true_positive, svc_rbf_true_positive],
-                                        "False Positive": [svc_linear_false_positive, svc_sgd_false_positive, svc_poly_false_positive, svc_sigmoid_false_positive, svc_rbf_false_positive]})
-    print(positive_class_data[["True Positive", "False Positive"]])
-    print(positive_class_data[["True Positive", "False Positive"]].to_numpy())
+    positive_class_data = {"Linear": [svc_linear_true_positive, svc_linear_false_positive], "Linear SGD": [svc_sgd_true_positive, svc_sgd_false_positive], "Polynomial": [svc_poly_true_positive, svc_poly_false_positive], "Sigmoid": [svc_sigmoid_true_positive, svc_sigmoid_false_positive], "RBF": [svc_rbf_true_positive, svc_rbf_false_positive]}
+
+    fig, [ax1, ax2, ax3, ax4, ax5] = plt.subplots(nrows=1, ncols=5)
+    ax1.bar(data=positive_class_data["Linear"], height=[positive_class_data[1][0], positive_class_data[2][0]], label=positive_class_data[0][0])
+
 
     # Comparing TP/FP on Two-layer Bar Plot
     plt.hist(x=np.array(positive_class_data[["True Positive", "False Positive"]].to_numpy()), histtype='bar', density=True, color=['green', 'red'], label=["True Positive", "False Positive"])
