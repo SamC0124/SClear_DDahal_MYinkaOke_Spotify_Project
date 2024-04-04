@@ -37,8 +37,7 @@ import time
 #   we have the average popularity scores for each popular song, but I believe it would confound our project's ability
 #   to return songs that a person would actually like.
 
-
-# if __name__ == '__main__':
+if __name__ == '__main__':
     # TODO: Feature Engineering
     # TODO: Determine whether patterns can be predicted from the data, switch datasets if not.
     # TODO: Implement the KNN Model on our Data
