@@ -20,7 +20,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_predict, train_test_split
+from sklearn.model_selection import cross_val_predict, train_test_split, GridSearchCV
 from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
 from sklearn.svm import SVC
 from sklearn.datasets import make_classification
@@ -126,6 +126,19 @@ if __name__ == '__main__':
     plt.colorbar()
     plt.show()
 
+    average_data = pop_data[
+        ['duration_ms', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness', 'acousticness',
+         'instrumentalness',
+         'liveness', 'valence', 'tempo', 'time_signature']].mean()
+
+    '''using the average we set the upper limit/threshold to predict the popularity of a song
+    * once our model is created we can see what features make the song popular 
+    * we would most likely need create some sort of classification to check the features '''
+
+    plt.scatter(data=pop_data, x='tempo', y='popularity')
+    plt.show()
+    print(average_data)
+
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
     ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
     # Collect portion of dataset for X (features to gauge popularity by) and Y (popularity classification
@@ -182,20 +195,35 @@ if __name__ == '__main__':
     svc_sigmoid_true_positive, svc_sigmoid_false_positive = retrieve_positive_classifications(y_test, y_pred_poly)
     svc_rbf_true_positive, svc_rbf_false_positive = retrieve_positive_classifications(y_test, y_pred_rbf)
 
-    positive_class_data = {"Linear": [svc_linear_true_positive, svc_linear_false_positive], "Linear SGD": [svc_sgd_true_positive, svc_sgd_false_positive], "Polynomial": [svc_poly_true_positive, svc_poly_false_positive], "Sigmoid": [svc_sigmoid_true_positive, svc_sigmoid_false_positive], "RBF": [svc_rbf_true_positive, svc_rbf_false_positive]}
+    class_given = ("Linear", "Linear SGD", "Polynomial", "Sigmoid", "RBF")
+    positive_class_data = {"True Positive": [svc_linear_true_positive, svc_sgd_true_positive, svc_poly_true_positive, svc_sigmoid_true_positive, svc_rbf_true_positive],
+                           "False Positive": [svc_linear_false_positive, svc_sgd_false_positive, svc_poly_false_positive, svc_sigmoid_false_positive, svc_rbf_false_positive]}
 
-    fig, [ax1, ax2, ax3, ax4, ax5] = plt.subplots(nrows=1, ncols=5)
-    ax1.bar(data=positive_class_data["Linear"], height=[positive_class_data[1][0], positive_class_data[2][0]], label=positive_class_data[0][0])
+    # This plot was inspired by Matplotlib's barplot example: "Grouped Bar Plots with Labels".
+    x = np.arange(len(class_given))  # the label locations
+    width = 0.25  # the width of the bars
+    multiplier = 0
 
+    fig, ax = plt.subplots()
+    for attribute, measurement in positive_class_data.items():
+        offset = width * multiplier
+        rects = ax.bar(x + offset, measurement, width, label=attribute)
+        ax.bar_label(rects, padding=2)
+        multiplier += 1
 
-    # Comparing TP/FP on Two-layer Bar Plot
-    plt.hist(x=np.array(positive_class_data[["True Positive", "False Positive"]].to_numpy()), histtype='bar', density=True, color=['green', 'red'], label=["True Positive", "False Positive"])
+    # Add some text for labels, title and custom x-axis tick labels, etc.
     plt.xlabel("Kernel Type for SVC, divided by TP and FP Totals")
     plt.ylabel("Totals Correct/Incorrect Classifications")
     plt.title("Comparing Kernel Classifications by True/False Positive Totals")
-    plt.legend()
+    ax.set_xticks(ticks=(x + width), labels=class_given)
+    ax.legend(loc='upper left', ncols=2)
+    ax.set_ylim(0, 250)
     plt.show()
-    exit()
+
+    print("The Linear Gradient Descent linear-kernel SVM appears to work the best for classifying whether data is popular or not accurately, when we make the dataset more equal for each class. What can we do to refine this model further?")
+    # Grid Search CV?
+    # Hyperparameters we can change: C, coef_, degree, num_features_in_, intercept_ (This has also been played around with by Michael),
+    SVC()
 
     # What are the equations computing popularity from the two highest support vectors (values of each feature)?
     most_significant_vector = svm_classifier_poly.support_vectors[0]
@@ -215,19 +243,6 @@ if __name__ == '__main__':
     # Calculate average of specified columns
     '''using that data we find the average the durations_ms, danceability, 
     energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
-
-    average_data = pop_data[
-        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
-         'liveness',
-         'valence', 'tempo', 'time_signature']].mean()
-
-    '''using the average we set the upper limit/threshold to predict the popularity of a song
-    * once our model is created we can see what features make the song popular 
-    * we would most likely need create some sort of classification to check the features '''
-
-    plt.scatter(data=pop_data, x='tempo', y='popularity')
-    plt.show()
-    print(average_data)
 
     ## Decision Tree Modeling
     # First Decision Tree Model - All features

@@ -44,7 +44,6 @@ import time
     # TODO: Implement the KNN Model on our Data
     # TODO: Create Decision Tree Model
 
-
     ## Cleaning Data
     # Load Dataset
     music_data = pd.read_csv('data/Best_Songs_of_Spotify_from_2000-2023.csv', sep=";")
