@@ -158,7 +158,6 @@ if __name__ == '__main__':
     print(f"Polynomial Kernel: {accuracy_poly}")
     print(f"Sigmoid Kernel: {accuracy_sigmoid}")
     print(f"RBF Kernel: {accuracy_rbf}")
-    exit()
 
     # What classification errors were made in each type of model? Collect true positives against false positives for each type of kernel
     svc_linear_true_positive, svc_linear_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
