@@ -63,14 +63,12 @@ if __name__ == '__main__':
     cont_pop_data.loc[:, 'duration_s'] = cont_pop_data['duration_ms'] / 1000
     cont_pop_data = cont_pop_data.drop(columns=['track_id', 'key']).dropna()
 
-    # Load data and drop unnecessary columns and rows with null values
+    # Load data and drop unnecessary columns and rows with null values.
     unique_data = music_data.drop(columns=['track_id', 'key']).dropna()
 
-    '''using the average we can make model like linear regression, decision tree, or forest'''
+    # Classifying popularity of data based off of whether it's popularity value is greater than 75 (1) or not (0).
     cleared_data = unique_data
-    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular')
-    print(len(cleared_data[cleared_data['popularity'] == 'popular']),
-          len(cleared_data[cleared_data['popularity'] == 'not_popular']))
+    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 1 if x > 75 else 0)
 
     # Convert True to 1 and False to 0 in the "popularity" column
     cleared_data['explicit'] = cleared_data['explicit'].astype(int)
@@ -92,7 +90,18 @@ if __name__ == '__main__':
     # use to evaluate the relationship between different characteristics in songs, Popularity, and Dancability?
     # Another thing to note is that some tracks are entered into the dataset more than once. These songs will be
     # overrepresented in the dataset, so we can just take unique values by track ID.
-    print(music_data.info())
+    music_data = music_data.reset_index()
+
+    # Under-sampling the negative class for the data, picking from equal portions of the data throughout.
+    print(f"Positive Class: {len(cleared_data[cleared_data['popularity'] == 1])}, Negative Class: {len(cleared_data[cleared_data['popularity'] == 0])}")
+    floor_divisor = len(cleared_data[cleared_data['popularity'] == 0]) // len(cleared_data[cleared_data['popularity'] == 1])
+    current_new_data = []
+    for i in range(len(cleared_data[cleared_data["popularity"] == 1])):
+        current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[i * floor_divisor])
+    undersampled_dataframe = pd.DataFrame(data=current_new_data, columns=columns_to_keep)
+    all_data = undersampled_dataframe.append(cleared_data[cleared_data['popularity'] == 1])
+    print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
+    print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'.")
 
     ## Prior Graphing, Gathering Insights
     # Computing correlations of data with highest popularity value
@@ -113,8 +122,8 @@ if __name__ == '__main__':
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
     ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
     # Generate noisy data
-    X = cleared_data[columns_to_keep][0:10000]
-    y = cleared_data['popularity'][0:10000]
+    X = cleared_data[columns_to_get_mean]
+    y = cleared_data['popularity']
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
@@ -176,25 +185,24 @@ if __name__ == '__main__':
     most_significant_vector = svm_classifier_poly.support_vectors[0]
     second_most_significant_vector = svm_classifier_poly.support_vectors[1]
 
+    print(f"Features: {columns_to_get_mean}\nSignificant Vector Feature Weights: {most_significant_vector}")
+
     # Currently the accuracy for the model is extremely high, but we don't know why.
     # What can we do to evaluate whether the model has not overfit the data or not?
     # How can we view how effectively the model has classified the data?
     print(svm_classifier_poly.n_features_in_)
     print(svm_classifier_poly.support_vectors_)
     plt.imshow(svm_classifier_poly.support_vectors_)
-    plt.title("Support vector ")
+
     # Calculate accuracy
-    accuracy = accuracy_score(y_test, y_pred)
+    accuracy = accuracy_score(y_test, y_pred_linear)
     print("Accuracy:", accuracy)
+    exit()
 
-    # Calculate average of specified columns
-    '''using that data we find the average the durations_ms, danceability, 
-    energy, loudness and any other factors that can help us make a model to predict the popularity of a song'''
-
+    # Calculate average of specified columns, which we can use to predict the popularity of a song
     average_data = pop_data[
         ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
-         'liveness',
-         'valence', 'tempo', 'time_signature']].mean()
+         'liveness', 'valence', 'tempo', 'time_signature']].mean()
 
     '''using the average we set the upper limit/threshold to predict the popularity of a song
     * once our model is created we can see what features make the song popular 
