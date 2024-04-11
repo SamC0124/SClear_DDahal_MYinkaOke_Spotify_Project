@@ -44,15 +44,51 @@ from sklearn import tree
 # Function for collecting the false positives and the true positives from a classifiers confusion matrix.
 # Input: Two lists for actual and predicted values.
 # Output: Two totals for number of True positives and False positives.
+# Temporarily to-be-deprecated
 def retrieve_positive_classifications(p_y_test, p_y_pred):
     true_negative, false_positive, false_negative, true_positive = confusion_matrix(p_y_test, p_y_pred).ravel()
     return true_positive, false_positive
 
-
+# Current Version of Main Function for Dataset 1
 if __name__ == '__main__':
-    ## Data Cleaning
+
     music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
 
+    ## Prior Graphing, Gathering Insights
+    # Computing correlations of data with highest popularity value
+    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
+    * also if we want we can increase the number of popularity for better accuracy'''
+    pop_data = music_data[music_data['popularity'] > 75]
+    pop_columns = ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
+                   'energy',
+                   'key', 'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence',
+                   'tempo',
+                   'time_signature', 'track_genre']
+    plt.imshow(pop_data.corr(), cmap="PuBu")
+    plt.xticks(ticks=range(len(pop_columns)), labels=pop_columns, rotation=90)
+    plt.yticks(ticks=range(len(pop_columns)), labels=pop_columns)
+    plt.title("Correlations between Characteristics of Songs with High Popularities")
+    plt.tight_layout()
+    plt.colorbar()
+    plt.close()
+
+    # Calculate average of specified columns, which we can use to predict the popularity of a song
+    average_data = pop_data[
+        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
+         'liveness', 'valence', 'tempo', 'time_signature']].mean()
+
+    '''using the average we set the upper limit/threshold to predict the popularity of a song
+    * once our model is created we can see what features make the song popular 
+    * we would most likely need create some sort of classification to check the features '''
+
+    plt.scatter(data=pop_data, x='duration_ms', y='popularity')
+    plt.ylabel("Popularity Score of Song (0 to 1)")
+    plt.xlabel("Duration of the Song (Milliseconds)")
+    plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
+    plt.close()
+    print(average_data)
+
+    ## Data Cleaning
     # Try removing all popularity values that are equal to zero. These songs may have never been evaluated, which may
     # misrepresent the true metrics of an unpopular song.
     music_data = music_data[music_data['popularity'] > 0]
@@ -78,8 +114,15 @@ if __name__ == '__main__':
     # Convert milliseconds to seconds
     cleared_data['duration_s'] = cleared_data['duration_ms'] / 1000
 
-    print(music_data.describe())
-    print("Some of the data is unnamed, has no popularity, tempo, or time signature. This data is likely null.")
+    # Select numeric columns for modeling (This removes any additional string columns that we haven't already
+    # removed in this subset of the dataset for training ML algorithms).
+    numeric_cols = cleared_data.select_dtypes(include='number')
+
+    # Min-max normalization with entire dataset
+    pop_norm = (numeric_cols - numeric_cols.min()) / (numeric_cols.max() - numeric_cols.min())
+
+    # Standardization with standard deviation of all columns in the dataset?
+    pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std()
 
     # List of columns you want to keep (Including Key)
     columns_to_keep = ['popularity', 'duration_s', 'explicit', 'danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
@@ -91,9 +134,9 @@ if __name__ == '__main__':
     # use to evaluate the relationship between different characteristics in songs, Popularity, and Dancability?
     # Another thing to note is that some tracks are entered into the dataset more than once. These songs will be
     # overrepresented in the dataset, so we can just take unique values by track ID.
-    cleared_data.info()
+    #cleared_data.info()
 
-    # Under-sampling the negative class for the data, picking from equal portions of the data throughout.
+    ## Under-sampling the negative class for the data, picking from equal portions of the data throughout.
     print(f"Positive Class: {len(cleared_data[cleared_data['popularity'] == 1])}, Negative Class: {len(cleared_data[cleared_data['popularity'] == 0])}")
     floor_divisor = len(cleared_data[cleared_data['popularity'] == 0]) // len(cleared_data[cleared_data['popularity'] == 1])
     current_new_data = []
@@ -104,43 +147,31 @@ if __name__ == '__main__':
     print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
     print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'.")
 
-    ## Prior Graphing, Gathering Insights
-    # Computing correlations of data with highest popularity value
-    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
-    * also if we want we can increase the number of popularity for better accuracy'''
-    pop_data = music_data[music_data['popularity'] > 75]
-    pop_columns = ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability', 'energy',
-                'key', 'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo',
-                'time_signature', 'track_genre']
-    plt.imshow(pop_data.corr(), cmap="PuBu")
-    plt.xticks(ticks=range(len(pop_columns)), labels=pop_columns, rotation=90)
-    plt.yticks(ticks=range(len(pop_columns)), labels=pop_columns)
-    plt.title("Correlations between Characteristics of Songs with High Popularities")
-    plt.tight_layout()
-    plt.colorbar()
-    plt.close()
+    all_numeric_data = all_data.select_dtypes(include='number').drop(columns=['duration_ms', 'index', ])
 
-    # Calculate average of specified columns, which we can use to predict the popularity of a song
-    average_data = pop_data[
-        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
-         'liveness', 'valence', 'tempo', 'time_signature']].mean()
+    # Normalize the under-sampled data
+    norm_undersampled = (all_numeric_data - all_numeric_data.min()) / (all_numeric_data.max() - all_numeric_data.min())
 
-    '''using the average we set the upper limit/threshold to predict the popularity of a song
-    * once our model is created we can see what features make the song popular 
-    * we would most likely need create some sort of classification to check the features '''
-
-    plt.scatter(data=pop_data, x='valence', y='popularity')
-    plt.show()
-    print(average_data)
+    # Standardization with standard deviation of all columns in the dataset?
+    stan_undersampled = (all_numeric_data - all_numeric_data.mean()) / all_numeric_data.std()
 
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
-    ## With the current hour of this work, this program has been assisted by ChatGPT, plotting will be done on our own.
+    ## The very initial version of this file was constructed with the support of ChatGPT, but has been built
+    ## up significantly since then.
+
     # Generate noisy data
-    X = all_data[columns_to_get_mean]
-    y = all_data['popularity']
+    X = norm_undersampled[columns_to_get_mean]
+    y = norm_undersampled['popularity']
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+    # Finding average accuracy values of each model, comparing the models
+    accuracies_linear = []
+    accuracies_sgd = []
+    accuracies_poly = []
+    accuracies_sigmoid = []
+    accuracies_rbf = []
 
     # Create SVM classifier with soft-margin (C=1)
     # Measure differences in SVM Accuracy by kernel
@@ -151,6 +182,34 @@ if __name__ == '__main__':
     svm_classifier_sigmoid = SVC(kernel='sigmoid', degree=3, C=1)
     svm_classifier_rbf = SVC(degree=3, C=1)
 
+    # Process the data through each of these five models 10 times to calculate the true accuracy of the model
+    for _ in range(9):
+
+        # Train the classifiers
+        print("Training classifiers...")
+        svm_classifier_linear.fit(X_train, y_train)
+        svm_classifier_sgd.fit(X_train, y_train)
+        svm_classifier_poly.fit(X_train, y_train)
+        svm_classifier_sigmoid.fit(X_train, y_train)
+        svm_classifier_rbf.fit(X_train, y_train)
+
+        # Make predictions on test data
+        print("Classifying unseen data based on trained classifiers...")
+        y_pred_linear = svm_classifier_linear.predict(X_test)
+        y_pred_sdg = svm_classifier_sgd.predict(X_test)
+        y_pred_poly = svm_classifier_poly.predict(X_test)
+        y_pred_sigmoid = svm_classifier_sigmoid.predict(X_test)
+        y_pred_rbf = svm_classifier_rbf.predict(X_test)
+
+        # Calculate accuracy of each model
+        print("Processing the accuracy of each classifier, compared to actual data values...")
+        accuracies_linear.append(accuracy_score(y_test, y_pred_linear))
+        accuracies_sgd.append(accuracy_score(y_test, y_pred_sdg))
+        accuracies_poly.append(accuracy_score(y_test, y_pred_poly))
+        accuracies_sigmoid.append(accuracy_score(y_test, y_pred_sigmoid))
+        accuracies_rbf.append(accuracy_score(y_test, y_pred_rbf))
+
+    # Last iteration occurs outside of the loop for graphing purposes
     # Train the classifiers
     print("Training classifiers...")
     svm_classifier_linear.fit(X_train, y_train)
@@ -162,51 +221,58 @@ if __name__ == '__main__':
     # Make predictions on test data
     print("Classifying unseen data based on trained classifiers...")
     y_pred_linear = svm_classifier_linear.predict(X_test)
-    y_pred_sdg = svm_classifier_sgd.predict(X_test)
+    y_pred_sgd = svm_classifier_sgd.predict(X_test)
     y_pred_poly = svm_classifier_poly.predict(X_test)
     y_pred_sigmoid = svm_classifier_sigmoid.predict(X_test)
     y_pred_rbf = svm_classifier_rbf.predict(X_test)
 
     # Calculate accuracy of each model
     print("Processing the accuracy of each classifier, compared to actual data values...")
-    accuracy_linear = accuracy_score(y_test, y_pred_linear)
-    accuracy_sgd = accuracy_score(y_test, y_pred_sdg)
-    accuracy_poly = accuracy_score(y_test, y_pred_poly)
-    accuracy_sigmoid = accuracy_score(y_test, y_pred_sigmoid)
-    accuracy_rbf = accuracy_score(y_test, y_pred_rbf)
+    accuracies_linear.append(accuracy_score(y_test, y_pred_linear))
+    accuracies_sgd.append(accuracy_score(y_test, y_pred_sgd))
+    accuracies_poly.append(accuracy_score(y_test, y_pred_poly))
+    accuracies_sigmoid.append(accuracy_score(y_test, y_pred_sigmoid))
+    accuracies_rbf.append(accuracy_score(y_test, y_pred_rbf))
+
+    # Calculate the final average accuracies of each of the models, print results
+    avg_acc_linear = np.mean(accuracies_linear)
+    avg_acc_sgd = np.mean(accuracies_sgd)
+    avg_acc_poly = np.mean(accuracies_poly)
+    avg_acc_sigmoid = np.mean(accuracies_sigmoid)
+    avg_acc_rbf = np.mean(accuracies_rbf)
 
     print("Model Accuracy by Kernel/Method")
-    print(f"Linear Kernel: {accuracy_linear}")
-    print(f"Linear SGD Kernel: {accuracy_sgd}")
-    print(f"Polynomial Kernel: {accuracy_poly}")
-    print(f"Sigmoid Kernel: {accuracy_sigmoid}")
-    print(f"RBF Kernel: {accuracy_rbf}")
+    print(f"Linear Kernel: {avg_acc_linear}")
+    print(f"Linear SGD Kernel: {avg_acc_sgd}")
+    print(f"Polynomial Kernel: {avg_acc_poly}")
+    print(f"Sigmoid Kernel: {avg_acc_sigmoid}")
+    print(f"RBF Kernel: {avg_acc_rbf}")
 
     # What classification errors were made in each type of model? Collect true positives against false positives for each type of kernel
-    svc_linear_true_positive, svc_linear_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
-    svc_sgd_true_positive, svc_sgd_false_positive = retrieve_positive_classifications(y_test, y_pred_sdg)
-    svc_poly_true_positive, svc_poly_false_positive = retrieve_positive_classifications(y_test, y_pred_poly)
-    svc_sigmoid_true_positive, svc_sigmoid_false_positive = retrieve_positive_classifications(y_test, y_pred_sigmoid)
-    svc_rbf_true_positive, svc_rbf_false_positive = retrieve_positive_classifications(y_test, y_pred_rbf)
+    linear_tn, linear_fp, linear_fn, linear_tp = confusion_matrix(y_test, y_pred_linear).ravel()
+    sgd_tn, sgd_fp, sgd_fn, sgd_tp = confusion_matrix(y_test, y_pred_sgd).ravel()
+    poly_tn, poly_fp, poly_fn, poly_tp = confusion_matrix(y_test, y_pred_poly).ravel()
+    sigmoid_tn, sigmoid_fp, sigmoid_fn, sigmoid_tp = confusion_matrix(y_test, y_pred_sigmoid).ravel()
+    rbf_tn, rbf_fp, rbf_fn, rbf_tp = confusion_matrix(y_test, y_pred_rbf).ravel()
 
     # Comparing TP/FP on Two-layer Bar Plot
     class_given = ("Linear", "Linear SGD", "Polynomial", "Sigmoid", "RBF")
-    positive_class_data = {"True Positive": [svc_linear_true_positive, svc_sgd_true_positive, svc_poly_true_positive,
-                                             svc_sigmoid_true_positive, svc_rbf_true_positive],
-                           "False Positive": [svc_linear_false_positive, svc_sgd_false_positive,
-                                              svc_poly_false_positive, svc_sigmoid_false_positive,
-                                              svc_rbf_false_positive]}
+    positive_class_data = {"True Positive": [linear_tp, sgd_tp, poly_tp, sigmoid_tp, rbf_tp],
+                           "False Positive": [linear_fp, sgd_fp, poly_fp, sigmoid_fp, rbf_fp]}
+    negative_class_data = {"False Negative": [linear_fn, sgd_fn, poly_fn, sigmoid_fn, rbf_fn],
+                           "True Negative": [linear_tn, sgd_tn, poly_tn, sigmoid_tn, rbf_tn]}
 
     # This plot was inspired by Matplotlib's barplot example: "Grouped Bar Plots with Labels".
     x = np.arange(len(class_given))  # the label locations
     width = 0.25  # the width of the bars
     multiplier = 0
 
+    # Positive Class Plot
     fig, ax = plt.subplots()
     for attribute, measurement in positive_class_data.items():
         offset = width * multiplier
         rects = ax.bar(x + offset, measurement, width, label=attribute)
-        ax.bar_label(rects, padding=2)
+        ax.bar_label(rects, padding=4)
         multiplier += 1
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
@@ -217,6 +283,25 @@ if __name__ == '__main__':
     ax.legend(loc='upper left', ncols=2)
     ax.set_ylim(0, 250)
     plt.show()
+    plt.close()
+
+    # Negative Class Plot
+    fig, ax = plt.subplots()
+    for attribute, measurement in negative_class_data.items():
+        offset = width * multiplier
+        rects = ax.bar(x + offset, measurement, width, label=attribute)
+        ax.bar_label(rects, padding=4)
+        multiplier += 1
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    plt.xlabel("Kernel Type for SVC, divided by TP and FP Totals")
+    plt.ylabel("Totals Correct/Incorrect Classifications")
+    plt.title("Comparing Kernel Classifications by True/False Positive Totals")
+    ax.set_xticks(ticks=(x + width), labels=class_given)
+    ax.legend(loc='upper left', ncols=2)
+    ax.set_ylim(0, 250)
+    plt.show()
+    exit()
 
     # Use RandomSearchCV for remaining hyperparameters to automate
     # features = {"C": [0.5 * x for x in range(20)], "degree": [x for x in range(20)]}
@@ -225,8 +310,8 @@ if __name__ == '__main__':
     # print(params.best_params_) # Returns the values (degree: 16, C: 3)
 
     # What are the equations computing popularity from the two highest support vectors (values of each feature)?
-    most_significant_vector = svm_classifier_poly.support_vectors_[0]
-    second_most_significant_vector = svm_classifier_poly.support_vectors_[1]
+    most_significant_vector = svm_classifier_linear.support_vectors_[0]
+    second_most_significant_vector = svm_classifier_linear.support_vectors_[1]
 
     # Using the features with the highest absolute values, we will plot a scatterplot graph that separates the most
     # popular songs from the least popular songs. The axes will be determined by the most significant variables of each
@@ -266,9 +351,8 @@ if __name__ == '__main__':
                                     filled=True, rounded=True,
                                     special_characters=True)
     graph = graphviz.Source(dot_data)
-    exit()
 
-    ## K-Means Clustering: Not Fit for Model
+    ## K-Means Clustering: Replacing with Random Forest Classifier Soon
     # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
     # cont_pop_data["popularity_groups"] = pop_clusters.labels_
     #
