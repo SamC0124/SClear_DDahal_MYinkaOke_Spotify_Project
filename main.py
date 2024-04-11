@@ -14,7 +14,7 @@ import pandas as pd
 import seaborn as sns
 import string
 import sklearn as sk
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, SGDClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
@@ -37,6 +37,15 @@ import time
 #   we have the average popularity scores for each popular song, but I believe it would confound our project's ability
 #   to return songs that a person would actually like.
 
+
+# Function for collecting the false positives and the true positives from a classifiers confusion matrix.
+# Input: Two lists for actual and predicted values.
+# Output: Two totals for number of True positives and False positives.
+def retrieve_positive_classifications(p_y_test, p_y_pred):
+    true_negaive, false_positive, false_negative, true_positive = confusion_matrix(p_y_test, p_y_pred).ravel()
+    return true_positive, false_positive
+
+
 if __name__ == '__main__':
     # TODO: Feature Engineering
     # TODO: Determine whether patterns can be predicted from the data, switch datasets if not.
@@ -49,7 +58,7 @@ if __name__ == '__main__':
     music_data = pd.read_csv('data/Best_Songs_of_Spotify_from_2000-2023.csv', sep=";")
 
     # Change Decibels to floating point numbers (Numbers represent power of 10)
-    music_data['dB'] = [math.pow(10, val) for val in music_data['dB']]
+    # music_data['dB'] = [math.pow(10, val) for val in music_data['dB']]
 
     # Remove duplicate songs and NA values from the list
     duplicates = music_data[music_data.duplicated('title')]
@@ -98,23 +107,22 @@ if __name__ == '__main__':
     plt.scatter(data=unique_data, x="dB", y="bpm")
     plt.xlabel("Volume of Max Gain in Decibels For Song")
     plt.ylabel("Tempo of the Song (bpm)")
-    plt.title("Wholesale Popularity by Variable Levels")
-    plt.show()
+    plt.title("Tempo by Volume")
     plt.close()
+    # Because of the wide variety of points, there isn't a strong correlation between these two variables
 
     ## Standardization and Normalization
-    '''using the average we can make model like linear regression, decision tree, or forest'''
-    # List of columns you want to keep
+    # List of columns to keep for evaluating in statistical models
     columns_to_keep = ['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration', 'acousticness',
                        'speechiness', 'popularity']
     columns_to_get_mean = ['year', 'bpm', 'energy', 'danceability', 'dB', 'liveness', 'valence', 'duration',
                            'acousticness', 'speechiness']
 
-    # Create seperate dataset for modifying
+    # Create separate dataset for modifying
     cleared_data = unique_data[columns_to_keep]
-    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 'popular' if x > 75 else 'not_popular')
+    cleared_data['popularity'] = cleared_data['popularity'].apply(lambda x: 1 if x > 60 else 0)
 
-    print(f"Popularity Classes: Positive ({len(cleared_data[cleared_data['popularity'] == 'popular'])}), Negative ({len(cleared_data[cleared_data['popularity'] == 'not_popular'])})")
+    print(f"Popularity Classes: Positive ({len(cleared_data[cleared_data['popularity'] == 1])}), Negative ({len(cleared_data[cleared_data['popularity'] == 0])})")
 
     # Load data and drop unnecessary columns and rows with null values
     # Normalized version of data
@@ -165,7 +173,99 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
     # Create SVM classifier with soft-margin (C=1)
-    svm_classifier = SVC(kernel='poly', degree=4, C=0.1)
+    # Measure differences in SVM Accuracy by kernel
+    print("Creating Classifiers...")
+    svm_classifier_linear = SVC(kernel='linear', degree=3, C=1, random_state=1)
+    svm_classifier_sgd = SGDClassifier(max_iter=25, random_state=1)
+    svm_classifier_poly = SVC(kernel='poly', degree=3, C=1, random_state=1)
+    svm_classifier_sigmoid = SVC(kernel='sigmoid', degree=3, C=1, random_state=1)
+    svm_classifier_rbf = SVC(degree=3, C=1, random_state=1)
+
+    # Train the classifiers
+    print("Training Classifiers...")
+    svm_classifier_linear.fit(X_train, y_train)
+    svm_classifier_sgd.fit(X_train, y_train)
+    svm_classifier_poly.fit(X_train, y_train)
+    svm_classifier_sigmoid.fit(X_train, y_train)
+    svm_classifier_rbf.fit(X_train, y_train)
+
+    # Make predictions on test data
+    print("Classifying unseen data based on trained classifiers...")
+    y_pred_linear = svm_classifier_linear.predict(X_test)
+    y_pred_sdg = svm_classifier_sgd.predict(X_test)
+    y_pred_poly = svm_classifier_poly.predict(X_test)
+    y_pred_sigmoid = svm_classifier_sigmoid.predict(X_test)
+    y_pred_rbf = svm_classifier_rbf.predict(X_test)
+
+    # Calculate accuracy of each model
+    print("Processing the accuracy of each classifier, compared to actual data values...")
+    accuracy_linear = accuracy_score(y_test, y_pred_linear)
+    accuracy_sgd = accuracy_score(y_test, y_pred_sdg)
+    accuracy_poly = accuracy_score(y_test, y_pred_poly)
+    accuracy_sigmoid = accuracy_score(y_test, y_pred_sigmoid)
+    accuracy_rbf = accuracy_score(y_test, y_pred_rbf)
+
+    print("Model Accuracy by Kernel/Method")
+    print(f"Linear Kernel: {accuracy_linear}")
+    print(f"Linear SGD Kernel: {accuracy_sgd}")
+    print(f"Polynomial Kernel: {accuracy_poly}")
+    print(f"Sigmoid Kernel: {accuracy_sigmoid}")
+    print(f"RBF Kernel: {accuracy_rbf}")
+
+    # What classification errors were made in each type of model? Collect true positives against false positives for each type of kernel
+    svc_linear_true_positive, svc_linear_false_positive = retrieve_positive_classifications(y_test, y_pred_linear)
+    svc_sgd_true_positive, svc_sgd_false_positive = retrieve_positive_classifications(y_test, y_pred_sdg)
+    svc_poly_true_positive, svc_poly_false_positive = retrieve_positive_classifications(y_test, y_pred_poly)
+    svc_sigmoid_true_positive, svc_sigmoid_false_positive = retrieve_positive_classifications(y_test, y_pred_sigmoid)
+    svc_rbf_true_positive, svc_rbf_false_positive = retrieve_positive_classifications(y_test, y_pred_rbf)
+
+    # Comparing TP/FP on Two-layer Bar Plot
+    class_given = ("Linear", "Linear SGD", "Polynomial", "Sigmoid", "RBF")
+    positive_class_data = {"True Positive": [svc_linear_true_positive, svc_sgd_true_positive, svc_poly_true_positive,
+                                             svc_sigmoid_true_positive, svc_rbf_true_positive],
+                           "False Positive": [svc_linear_false_positive, svc_sgd_false_positive,
+                                              svc_poly_false_positive, svc_sigmoid_false_positive,
+                                              svc_rbf_false_positive]}
+
+    # This plot was inspired by Matplotlib's barplot example: "Grouped Bar Plots with Labels".
+    x = np.arange(len(class_given))  # the label locations
+    width = 0.25  # the width of the bars
+    multiplier = 0
+
+    fig, ax = plt.subplots()
+    for attribute, measurement in positive_class_data.items():
+        offset = width * multiplier
+        rects = ax.bar(x + offset, measurement, width, label=attribute)
+        ax.bar_label(rects, padding=2)
+        multiplier += 1
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    plt.xlabel("Kernel Type for SVC, divided by TP and FP Totals")
+    plt.ylabel("Totals Correct/Incorrect Classifications")
+    plt.title("Comparing Kernel Classifications by True/False Positive Totals")
+    ax.set_xticks(ticks=(x + width), labels=class_given)
+    ax.legend(loc='upper left', ncols=2)
+    ax.set_ylim(0, 250)
+    plt.close()
+
+    print("The Linear Gradient Descent linear-kernel SVM appears to work the best for classifying whether data is " +
+          "popular or not accurately, when we make the dataset more equal for each class. What can we do to refine " +
+          "this model further?")
+
+    # What are the equations computing popularity from the two highest support vectors (values of each feature)?
+    most_significant_vector = svm_classifier_poly.support_vectors_[0]
+    second_most_significant_vector = svm_classifier_poly.support_vectors_[1]
+
+    print(f"Features: {columns_to_get_mean}\nSignificant Vector Feature Weights: {most_significant_vector}")
+
+    # Currently the accuracy for the model is extremely high, but we don't know why.
+    # What can we do to evaluate whether the model has not overfit the data or not?
+    # How can we view how effectively the model has classified the data?
+    print(svm_classifier_linear.n_features_in_)
+    print(svm_classifier_linear.support_vectors_)
+
+    # Create SVM classifier with soft-margin (C=1)
+    svm_classifier = SVC(kernel='linear', degree=3, C=1)
 
     # Train the classifier
     svm_classifier.fit(X_train, y_train)
@@ -175,7 +275,10 @@ if __name__ == '__main__':
 
     # Calculate accuracy
     accuracy = accuracy_score(y_test, y_pred)
+    conf_matrix = confusion_matrix(y_true=y_test, y_pred=y_pred)
     print("Accuracy:", accuracy)
+    print("Confusion Matrix:", conf_matrix)
+    exit()
 
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
