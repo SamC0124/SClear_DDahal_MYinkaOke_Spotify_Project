@@ -24,7 +24,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_predict, train_test_split, RandomizedSearchCV
-from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay, classification_report
+from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay, classification_report, roc_curve, roc_auc_score
 from sklearn.svm import SVC
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
@@ -47,53 +47,10 @@ from random import randint
 #   we have the average popularity scores for each popular song, but I believe it would confound our project's ability
 #   to return songs that a person would actually like.
 
-
-# Function for collecting the false positives and the true positives from a classifiers confusion matrix.
-# Input: Two lists for actual and predicted values.
-# Output: Two totals for number of True positives and False positives.
-# Temporarily to-be-deprecated
-def retrieve_positive_classifications(p_y_test, p_y_pred):
-    true_negative, false_positive, false_negative, true_positive = confusion_matrix(p_y_test, p_y_pred).ravel()
-    return true_positive, false_positive
-
 # Current Version of Main Function for Dataset 1
 if __name__ == '__main__':
 
     music_data = pd.read_csv('data/song_data.csv', index_col=0).dropna()
-
-    ## Prior Graphing, Gathering Insights
-    # Computing correlations of data with highest popularity value
-    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
-    * also if we want we can increase the number of popularity for better accuracy'''
-    pop_data = music_data[music_data['popularity'] > 75]
-    pop_columns = ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
-                   'energy',
-                   'key', 'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence',
-                   'tempo',
-                   'time_signature', 'track_genre']
-    plt.imshow(pop_data.corr(), cmap="PuBu")
-    plt.xticks(ticks=range(len(pop_columns)), labels=pop_columns, rotation=90)
-    plt.yticks(ticks=range(len(pop_columns)), labels=pop_columns)
-    plt.title("Correlations between Characteristics of Songs with High Popularities")
-    plt.tight_layout()
-    plt.colorbar()
-    plt.close()
-
-    # Calculate average of specified columns, which we can use to predict the popularity of a song
-    average_data = pop_data[
-        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
-         'liveness', 'valence', 'tempo', 'time_signature']].mean()
-
-    '''using the average we set the upper limit/threshold to predict the popularity of a song
-    * once our model is created we can see what features make the song popular 
-    * we would most likely need create some sort of classification to check the features '''
-
-    plt.scatter(data=pop_data, x='duration_ms', y='popularity')
-    plt.ylabel("Popularity Score of Song (0 to 1)")
-    plt.xlabel("Duration of the Song (Milliseconds)")
-    plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
-    plt.close()
-    print(average_data)
 
     ## Data Cleaning
     # Try removing all popularity values that are equal to zero. These songs may have never been evaluated, which may
@@ -143,6 +100,37 @@ if __name__ == '__main__':
     # overrepresented in the dataset, so we can just take unique values by track ID.
     #cleared_data.info()
 
+    ## Prior Graphing, Gathering Insights
+    # Computing correlations of data with highest popularity value
+    '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
+    * also if we want we can increase the number of popularity for better accuracy'''
+    pop_data = music_data[music_data['popularity'] > 75]
+    pop_columns = ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
+                   'energy',
+                   'key', 'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence',
+                   'tempo',
+                   'time_signature', 'track_genre']
+    plt.imshow(pop_data.corr(), cmap="PuBu")
+    plt.xticks(ticks=range(len(pop_columns)), labels=pop_columns, rotation=90)
+    plt.yticks(ticks=range(len(pop_columns)), labels=pop_columns)
+    plt.title("Correlations between Characteristics of Songs with High Popularities")
+    plt.tight_layout()
+    plt.colorbar()
+    plt.close()
+
+    # Calculate average of specified columns, which we can use to predict the popularity of a song
+    average_data = pop_data[
+        ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
+         'liveness', 'valence', 'tempo', 'time_signature']].mean()
+
+    # Compare popularity to another characteristic
+    plt.scatter(data=pop_data, x='duration_ms', y='popularity')
+    plt.ylabel("Popularity Score of Song (0 to 1)")
+    plt.xlabel("Duration of the Song (Milliseconds)")
+    plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
+    plt.close()
+    print(average_data)
+
     ## Under-sampling the negative class for the data, picking from equal portions of the data throughout.
     print(f"Positive Class: {len(cleared_data[cleared_data['popularity'] == 1])}, Negative Class: {len(cleared_data[cleared_data['popularity'] == 0])}")
     floor_divisor = len(cleared_data[cleared_data['popularity'] == 0]) // len(cleared_data[cleared_data['popularity'] == 1])
@@ -154,13 +142,14 @@ if __name__ == '__main__':
     print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
     print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'.")
 
-    all_numeric_data = all_data.select_dtypes(include='number').drop(columns=['duration_ms', 'index', ])
+    all_numeric_data = all_data.select_dtypes(include='number').drop(columns=['duration_ms', 'index'])
 
     # Normalize the under-sampled data
     norm_undersampled = (all_numeric_data - all_numeric_data.min()) / (all_numeric_data.max() - all_numeric_data.min())
 
     # Standardization with standard deviation of all columns in the dataset?
     stan_undersampled = (all_numeric_data - all_numeric_data.mean()) / all_numeric_data.std()
+
 
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
     ## The very initial version of this file was constructed with the support of ChatGPT, but has been built
@@ -309,6 +298,10 @@ if __name__ == '__main__':
     ax.set_ylim(0, 250)
     plt.show()
 
+    pred = svm_classifier_poly.predict_proba(X_test)[:, 1]
+
+    tpr_svm, fpr_svm, thresholds = roc_curve(y_test, pred)
+
     # Finding the best classifier model's average accuracy of features, verified by RandomSearchCV
     # accuracy_scores = []
     # for _ in range(8):
@@ -325,16 +318,19 @@ if __name__ == '__main__':
     # params = cross_validate.fit(X_train, y_train)
     # print(params.best_params_) # Returns the values (degree: 16, C: 3)
 
+
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
-    # This Decision Tree Classifier Program was adapted from the following site: https://scikit-learn.org/stable/modules/tree.html
-    all_data['popularity'] = all_data['popularity'].apply(lambda x: 'popular' if x == 1 else 'not_popular')
-    X = all_data[columns_to_get_mean]
-    Y = all_data['popularity']
-    clf = tree.DecisionTreeClassifier()
-    clf = clf.fit(X, Y)
-    print(tree.plot_tree(clf))
+    # This Decision Tree Classifier Program was adapted from the following site:
+    # https://scikit-learn.org/stable/modules/tree.html
+    X = norm_undersampled[columns_to_get_mean]
+    Y = norm_undersampled['popularity']
 
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    clf = tree.DecisionTreeClassifier()
+    clf = clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    decision_tree_matrix = confusion_matrix(y_test, y_pred)
     dot_data = tree.export_graphviz(clf, out_file=None,
                                     feature_names=columns_to_get_mean,
                                     class_names=['popular', 'not_popular'],
@@ -342,6 +338,11 @@ if __name__ == '__main__':
                                     special_characters=True)
     graph = graphviz.Source(dot_data)
     graph.render("decision_tree")
+
+    pred = clf.predict_proba(X_test)[:, 1]
+
+    tpr_decision_tree, fpr_decision_tree, thresholds = roc_curve(y_test, pred)
+
 
     ## Basic Random Forest Classifier
     # Create train/test sets
@@ -375,6 +376,10 @@ if __name__ == '__main__':
     # Predict values of y_test on the X_test set
     y_pred = best.predict(X_test)
 
+    roc_pred = best.predict_proba(X_test)[:, 1]
+
+    tpr_rfc, fpr_rfc, thresholds = roc_curve(y_test, roc_pred)
+
     # Evaluate the model's accuracy
     accuracy = accuracy_score(y_test, y_pred)
     classification_rep = classification_report(y_test, y_pred)
@@ -392,8 +397,7 @@ if __name__ == '__main__':
     graph = graphviz.Source(dot_data)
     graph.render(filename="rfc")
 
-    print("How does our graph do?")
-    exit()
+    print("How does our RFC do? Pretty bad to be honest, it's about as bad as random-guessing.")
 
     # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
     # cont_pop_data["popularity_groups"] = pop_clusters.labels_
@@ -416,38 +420,37 @@ if __name__ == '__main__':
     # fig.tight_layout()
     # plt.show()
 
+
     ## K-Nearest-Neighbors: Fit adequately for model
-    # Filtering columns
-    cleared_data = cleared_data[columns_to_keep]
-    # Reshape the data to long format
-    long_data = pd.melt(cleared_data, id_vars=['popularity'], var_name='feature', value_name='value')
-    # Calculate the mean for each feature and diagnosis
-    means = long_data.groupby(['feature', 'popularity'])['value'].mean().reset_index()
-    # Reshape the data back to wide format
-    wide_means = means.pivot(index='feature', columns='popularity', values='value')
-    # Print the result
-    print(wide_means)
-    # Create a box plot
-    sns.set(style="whitegrid")
-    g = sns.FacetGrid(long_data, col='feature', col_wrap=2, margin_titles=True,
-                      xlim=(long_data['value'].min(), long_data['value'].max()))
-    g.map(sns.boxplot, 'value', 'popularity', 'popularity', order=['popular', 'not_popular'],
-          hue_order=['popular', 'not_popular'], palette={"popular": "tomato", "not_popular": "cyan"})
-    plt.title("")
-    plt.xlabel("")
-    plt.ylabel("")
 
-    # Remove the legend
-    plt.legend().remove()
-    plt.xlim(left=0, right=1)
-    plt.show()
+    # # Reshape the data to long format
+    # long_data = pd.melt(cleared_data, id_vars=['popularity'], var_name='feature', value_name='value')
+    # # Calculate the mean for each feature and diagnosis
+    # means = long_data.groupby(['feature', 'popularity'])['value'].mean().reset_index()
+    # # Reshape the data back to wide format
+    # wide_means = means.pivot(index='feature', columns='popularity', values='value')
+    # # Print the result
+    # print(wide_means)
+    # # Create a box plot
+    # sns.set(style="whitegrid")
+    # g = sns.FacetGrid(long_data, col='feature', col_wrap=2, margin_titles=True,
+    #                   xlim=(long_data['value'].min(), long_data['value'].max()))
+    # g.map(sns.boxplot, 'value', 'popularity', 'popularity', order=['popular', 'not_popular'],
+    #       hue_order=['popular', 'not_popular'], palette={"popular": "tomato", "not_popular": "cyan"})
+    # plt.title("")
+    # plt.xlabel("")
+    # plt.ylabel("")
+    #
+    # # Remove the legend
+    # plt.legend().remove()
+    # plt.xlim(left=0, right=1)
+    # plt.show()
 
-    # Select numeric columns
-    numeric_cols = cleared_data.select_dtypes(include='number')
-    # Min-max normalization
-    pop_norm = (numeric_cols - numeric_cols.min()) / (numeric_cols.max() - numeric_cols.min())
-    # Standardization
-    pop_stan = (numeric_cols - numeric_cols.mean()) / numeric_cols.std()
+    # Min-max normalization completed above
+    pop_norm = norm_undersampled[columns_to_get_mean]
+    # Standardization completed above
+    pop_stan = stan_undersampled[columns_to_get_mean]
+
     # Create knn_results DataFrame
     knn_results = pd.DataFrame({'k': range(1, 5), 'pop_norm': [-1] * 4, 'pop_stan': [-1] * 4})
     # Displaying the knn_results DataFrame
@@ -458,43 +461,22 @@ if __name__ == '__main__':
     # Fit KNN Algorithm for normalized data
     for i in range(len(knn_results)):
         knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k'])
-        loop_knn = cross_val_predict(knn, pop_norm, cleared_data['popularity'], cv=4)
-        loop_norm_cm = confusion_matrix(loop_knn, cleared_data['popularity'])
-        accuracy = round(accuracy_score(loop_knn, cleared_data['popularity']), 2)
+        loop_knn = cross_val_predict(knn, pop_norm, norm_undersampled['popularity'], cv=6)
+        loop_norm_cm = confusion_matrix(loop_knn, norm_undersampled['popularity'])
+        accuracy = round(accuracy_score(loop_knn, norm_undersampled['popularity']), 2)
         print(f"Accuracy for k={knn_results.loc[i, 'k']} with normalized data: {accuracy}")
 
         # Debugging print
         knn_results.loc[i, 'pop_norm'] = accuracy
         # Fit KNN Algorithm for standardized data
         knn = KNeighborsClassifier(n_neighbors=knn_results.loc[i, 'k'])
-        loop_knn2 = cross_val_predict(knn, pop_stan, cleared_data['popularity'], cv=4)
-        accuracy2 = round(accuracy_score(loop_knn2, cleared_data['popularity']), 2)
+        loop_knn2 = cross_val_predict(knn, pop_stan, norm_undersampled['popularity'], cv=6)
+        accuracy2 = round(accuracy_score(loop_knn2, norm_undersampled['popularity']), 2)
         print(f"Accuracy for k={knn_results.loc[i, 'k']} with standardized data: {accuracy2}")
 
-        # Debugging print
+        # Record Accuracy
         knn_results.loc[i, 'pop_stan'] = accuracy2
-        # Displaying the first 10 rows of knn_results DataFrame
-        # print(knn_results.head(10))
-        # long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
 
-        # # # Create the plot
-        # plt.figure(figsize=(10, 6))
-        # sns.lineplot(data=long_knn_results, x='k', y='accuracy', hue='rescale_method')
-
-        # # # Set labels and title
-        # plt.xlabel('Choice of K') # plt.ylabel('Accuracy')
-        # plt.title('KNN Algorithm Performance')
-        # plt.legend(title='Rescale Method', labels=['Normalized', 'Standardized'])
-
-        # # # Set scale for x-axis and y-axis # plt.xticks(range(1, 6))
-        # plt.yticks(np.arange(0.95, 1.0, 0.01), labels=[f'{i:.2f}%' for i in np.arange(0.95, 1.0, 0.01)])
-
-        # # # Adjust legend position
-        # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
-        # # # Show plot
-        # plt.grid(True)
-        # plt.show()
         long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
         # Select the rows with the maximum accuracy for each rescale method
         max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()]
@@ -504,9 +486,30 @@ if __name__ == '__main__':
 
     long_knn_results = knn_results.melt(id_vars='k', var_name='rescale_method', value_name='accuracy')
 
+    # # Create the plot
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=long_knn_results, x='k', y='accuracy', hue='rescale_method')
+
+    # # Set labels and title
+    plt.xlabel('Choice of K')  # plt.ylabel('Accuracy')
+    plt.title('KNN Algorithm Performance')
+    plt.legend(title='Rescale Method', labels=['Normalized', 'Standardized'])
+
+    # # Set scale for x-axis and y-axis # plt.xticks(range(1, 6))
+    plt.yticks(np.arange(0.95, 1.0, 0.01), labels=[f'{i:.2f}%' for i in np.arange(0.95, 1.0, 0.01)])
+
+    # # Adjust legend position
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    # # Show plot
+    plt.grid(True)
+    plt.show()
+
     # Select the rows with the maximum accuracy for each rescale method
     max_accuracy_rows = long_knn_results.loc[long_knn_results.groupby('rescale_method')['accuracy'].idxmax()]
     print(max_accuracy_rows)
+
+    # Let's see how this model reacts to only being able to view an undersampled version of the data...
     # Ensure 'popularity' is included in pop_norm
     pop_norm['popularity'] = cleared_data['popularity']
     # Splitting data into features (X) and target (y)
@@ -517,14 +520,43 @@ if __name__ == '__main__':
     # Splitting data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     # Initializing KNN classifier
-    knn_classifier = KNeighborsClassifier(n_neighbors=2)
+    knn_classifier = KNeighborsClassifier(n_neighbors=10)
     # Fitting the classifier on the training data
     knn_classifier.fit(X_train, y_train)
     # Predicting on the test data
     y_pred = knn_classifier.predict(X_test)
+    pred = knn_classifier.predict_proba(X_test)[:, 1]
+
+    tpr_knn, fpr_knn, thresholds = roc_curve(y_test, pred)
+
     # Calculating confusion matrix
     cm = confusion_matrix(y_test, y_pred)
-    print(cm)
     # Displaying confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
     disp.plot()
+
+    # We can collect each of the accuracy metrics and plot them on a scatterplot, along with
+    # an expected ROC curve value and an identity line. This will show how each of them
+    # matches in terms or effectivity of the positive class, and the overall accuracy of the
+    # model if we use AUC.
+
+    # ROC Curve: TP vs FP
+    # Collecting accuracy statistics from each sample
+    svm_tp = poly_tp
+    svm_fp = poly_fp
+    svm_tn = poly_tn
+    svm_fn = poly_fn
+    decision_tree_tn, decision_tree_fp, decision_tree_fn, decision_tree_tp = decision_tree_matrix.ravel()
+    rfc_tn, rfc_fp, rfc_fn, rfc_tp = confusion_matrix(y_test, y_pred).ravel()
+    knn_tn, knn_fp, knn_fn, knn_tp = cm.ravel()
+
+    # Plotting Layered ROC curves for each of the machine learning models
+    plt.plot(tpr_svm, fpr_svm, color='cadetblue', label='SVM with Polynomial Kernel')
+    plt.plot(tpr_decision_tree, fpr_decision_tree, color='deepskyblue', label='SVM with Polynomial Kernel')
+    plt.plot(tpr_rfc, fpr_rfc, color='aqua', label='SVM with Polynomial Kernel')
+    plt.plot(tpr_knn, fpr_knn, color='darkcyan', label='SVM with Polynomial Kernel')
+    plt.plot([0, 1], [0, 1], '--', color='red', label='Random Guessing')
+    plt.title("ROC Curve Comparison between all tested Machine Learning Models")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.show()
