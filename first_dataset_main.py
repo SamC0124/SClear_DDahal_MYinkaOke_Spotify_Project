@@ -19,6 +19,8 @@ import pandas as pd
 import seaborn as sns
 import string
 import sklearn as sk
+import xgboost
+from random import randint
 from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
@@ -32,7 +34,6 @@ from sklearn.metrics import accuracy_score
 import time
 from sklearn import tree
 from sklearn.tree import export_graphviz
-from random import randint
 
 # Main function
 # Questions we want to answer: What features are the most effective at predicting whether a song is popular on Spotify?
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     floor_divisor = len(cleared_data[cleared_data['popularity'] == 0]) // len(cleared_data[cleared_data['popularity'] == 1])
     current_new_data = []
     for i in range(len(cleared_data[cleared_data["popularity"] == 1])):
-        current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[i * floor_divisor])
+        current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[(i * floor_divisor) + 5])
     undersampled_dataframe = pd.DataFrame(data=current_new_data, columns=columns_to_keep)
     all_data = undersampled_dataframe.append(cleared_data[cleared_data['popularity'] == 1])
     print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
@@ -298,9 +299,9 @@ if __name__ == '__main__':
     ax.set_ylim(0, 250)
     plt.show()
 
-    pred = svm_classifier_poly.predict_proba(X_test)[:, 1]
-
-    tpr_svm, fpr_svm, thresholds = roc_curve(y_test, pred)
+    # pred = svm_classifier_poly.predict_proba(X_test)[:, 1]
+    #
+    # tpr_svm, fpr_svm, thresholds = roc_curve(y_test, pred)
 
     # Finding the best classifier model's average accuracy of features, verified by RandomSearchCV
     # accuracy_scores = []
@@ -326,7 +327,8 @@ if __name__ == '__main__':
     X = norm_undersampled[columns_to_get_mean]
     Y = norm_undersampled['popularity']
 
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
+
     clf = tree.DecisionTreeClassifier()
     clf = clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
@@ -339,66 +341,52 @@ if __name__ == '__main__':
     graph = graphviz.Source(dot_data)
     graph.render("decision_tree")
 
-    pred = clf.predict_proba(X_test)[:, 1]
+    pred = clf.predict_proba(X_test)[:, 0]
 
     tpr_decision_tree, fpr_decision_tree, thresholds = roc_curve(y_test, pred)
 
 
-    ## Basic Random Forest Classifier
+    ## XGBoosted Random Forest Classifier
+    # How can we boost this RFC model?
     # Create train/test sets
     X = norm_undersampled[columns_to_get_mean]
     Y = norm_undersampled['popularity']
-    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
 
     # Define the hyperparameter space (possible values to try for each hyperparameter)
     param_dist = {
-        'n_estimators': [x for x in range(1,11)],
-        'max_depth': [x for x in range(1,11)],
+        'n_estimators': [x for x in range(1,25)],
+        'max_depth': [x for x in range(1,30)]
     }
 
     # Train a Random Forest classifier
     # if we wanted to optimize the hyperparameters, we could use a RandomizedSearchCV
     # just define the classifier with no hyperparameters
-    clf = RandomForestClassifier(random_state=42)
-    rand_search = RandomizedSearchCV(clf,
-                                     param_distributions=param_dist,
-                                     n_iter=3,
-                                     cv=3)
 
-    rand_search.fit(X_train, y_train)
+    from numpy import mean
+    from numpy import std
+    from sklearn.datasets import make_classification
+    from sklearn.model_selection import cross_val_score
+    from sklearn.model_selection import RepeatedStratifiedKFold
+    from xgboost import XGBRFClassifier
+    from xgboost import plot_tree
 
-    # optimal hyperparameters
-    best = rand_search.best_estimator_
+    # define the model
+    model = XGBRFClassifier(n_estimators=100, subsample=0.9, colsample_bynode=0.2)
+    # define the model evaluation procedure
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    # evaluate the model and collect the scores
+    n_scores = cross_val_score(model, X, Y, scoring='accuracy', cv=cv, n_jobs=-1)
+    # report performance
+    print('Mean Accuracy: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+    model.fit(X_train, y_train)
+    plot_tree(model)
+    plt.show()
 
-    # Fit the optimal model to our training data
-    best.fit(X_train, y_train)
+    prediction_probabilities = model.predict_proba(X_test)[:, 0]
+    tpr_rfc, fpr_rfc, _ = roc_curve(y_test, prediction_probabilities)
 
-    # Predict values of y_test on the X_test set
-    y_pred = best.predict(X_test)
-
-    roc_pred = best.predict_proba(X_test)[:, 1]
-
-    tpr_rfc, fpr_rfc, thresholds = roc_curve(y_test, roc_pred)
-
-    # Evaluate the model's accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-    classification_rep = classification_report(y_test, y_pred)
-
-    print(accuracy, "\n", classification_rep)
-
-    # Plot the decision trees
-    tree = best.estimators_[0]
-    dot_data = export_graphviz(tree, feature_names=X_train.columns,
-                               filled=True,
-                               max_depth=5,
-                               impurity=False,
-                               proportion=True)
-
-    graph = graphviz.Source(dot_data)
-    graph.render(filename="rfc")
-
-    print("How does our RFC do? Pretty bad to be honest, it's about as bad as random-guessing.")
-
+    print("How does our XGBRFClassifier do? Pretty bad to be honest, it's about as bad as random-guessing.")
     # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
     # cont_pop_data["popularity_groups"] = pop_clusters.labels_
     #
@@ -518,7 +506,7 @@ if __name__ == '__main__':
     y = pop_norm['popularity']
     # Use 'popularity' as the target column
     # Splitting data into train and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     # Initializing KNN classifier
     knn_classifier = KNeighborsClassifier(n_neighbors=10)
     # Fitting the classifier on the training data
@@ -533,7 +521,7 @@ if __name__ == '__main__':
     cm = confusion_matrix(y_test, y_pred)
     # Displaying confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
-    disp.plot()
+    #disp.plot()
 
     # We can collect each of the accuracy metrics and plot them on a scatterplot, along with
     # an expected ROC curve value and an identity line. This will show how each of them
@@ -550,13 +538,25 @@ if __name__ == '__main__':
     rfc_tn, rfc_fp, rfc_fn, rfc_tp = confusion_matrix(y_test, y_pred).ravel()
     knn_tn, knn_fp, knn_fn, knn_tp = cm.ravel()
 
+    # Finding probabilities of SVM classifier
+    svm_classifier_poly = SVC(kernel='poly', degree=3, C=1, probability=True)
+    svm_classifier_poly.fit(X_train, y_train)
+    svm_pred = svm_classifier_poly.decision_function(X_test)
+    tpr_svm, fpr_svm, _ = roc_curve(y_test, svm_pred)
+
+
     # Plotting Layered ROC curves for each of the machine learning models
-    plt.plot(tpr_svm, fpr_svm, color='cadetblue', label='SVM with Polynomial Kernel')
-    plt.plot(tpr_decision_tree, fpr_decision_tree, color='deepskyblue', label='SVM with Polynomial Kernel')
-    plt.plot(tpr_rfc, fpr_rfc, color='aqua', label='SVM with Polynomial Kernel')
-    plt.plot(tpr_knn, fpr_knn, color='darkcyan', label='SVM with Polynomial Kernel')
     plt.plot([0, 1], [0, 1], '--', color='red', label='Random Guessing')
+    plt.plot(tpr_svm, fpr_svm, color='cadetblue', label='SVM with Polynomial Kernel')
+    plt.plot(tpr_decision_tree, fpr_decision_tree, color='deepskyblue', label='Decision Tree')
+    plt.plot(tpr_rfc, fpr_rfc, color='aqua', label='XGBoost Random Forest Classifier')
+    plt.plot(tpr_knn, fpr_knn, color='darkcyan', label='K-Nearest-Neighbors')
     plt.title("ROC Curve Comparison between all tested Machine Learning Models")
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
+    plt.legend()
     plt.show()
+
+    # It appears that the KNN and Polynomial-kernel SVM models are close to being the most accurate. Is there
+    # statistical significance in the accuracy values of each of these models?
+    # Hypothesis Test
