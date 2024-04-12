@@ -2,10 +2,15 @@
 # Creators: Michael Yinka'Oke, Sam Clear, Diwas Dahal
 # Start Date: March 21st, 2024
 
-# This file currently acts as the main dataset inspecting file of the program, but will in the future just be
+# This file currently acts as the main dataset inspecting file of the program, but will eventually just be
 # used for running the main bulk of objects in the program.
 
 # Essential Packages for inspecting the data
+import graphviz
+import IPython
+from IPython.core.display_functions import display
+import joblib
+from joblib import parallel_backend
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,13 +24,15 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_predict, train_test_split, RandomizedSearchCV
-from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay, classification_report
 from sklearn.svm import SVC
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 import time
 from sklearn import tree
+from sklearn.tree import export_graphviz
+from random import randint
 
 # Main function
 # Questions we want to answer: What features are the most effective at predicting whether a song is popular on Spotify?
@@ -301,34 +308,22 @@ if __name__ == '__main__':
     ax.legend(loc='upper left', ncols=2)
     ax.set_ylim(0, 250)
     plt.show()
-    exit()
+
+    # Finding the best classifier model's average accuracy of features, verified by RandomSearchCV
+    # accuracy_scores = []
+    # for _ in range(8):
+    #     svm_classifier_best = SVC(kernel='linear', degree=16, C=3)
+    #     svm_classifier_best.fit(X_train, y_train)
+    #     y_pred_best = svm_classifier_best.predict(X_test)
+    #     accuracy_scores.append(round(accuracy_score(y_test, y_pred_best), 2))
+    # avg_acc_best_svc = np.mean(np.array(accuracy_scores))
+    # print(f"Average Accuracy of Optimized Hyperparameters: {np.mean(np.array(accuracy_scores))}")
 
     # Use RandomSearchCV for remaining hyperparameters to automate
     # features = {"C": [0.5 * x for x in range(20)], "degree": [x for x in range(20)]}
     # cross_validate = RandomizedSearchCV(svm_classifier_linear, features)
     # params = cross_validate.fit(X_train, y_train)
     # print(params.best_params_) # Returns the values (degree: 16, C: 3)
-
-    # What are the equations computing popularity from the two highest support vectors (values of each feature)?
-    most_significant_vector = svm_classifier_linear.support_vectors_[0]
-    second_most_significant_vector = svm_classifier_linear.support_vectors_[1]
-
-    # Using the features with the highest absolute values, we will plot a scatterplot graph that separates the most
-    # popular songs from the least popular songs. The axes will be determined by the most significant variables of each
-    # graph.
-    a = most_significant_vector[0] / most_significant_vector[1]
-
-    print(f"Features: {columns_to_get_mean}\nSignificant Vector Feature Weights: {most_significant_vector}")
-
-    # Finding the best classifier model by average accuracy of features, verified by RandomSearchCV
-    accuracy_scores = []
-    for _ in range(16):
-        svm_classifier_best = SVC(kernel='linear', degree=16, C=3)
-        svm_classifier_best.fit(X_train, y_train)
-        y_pred_best = svm_classifier_best.predict(X_test)
-        accuracy_scores.append(round(accuracy_score(y_test, y_pred_best), 2))
-    avg_acc_best_svc = np.mean(np.array(accuracy_scores))
-    print(f"Average Accuracy of Optimized Hyperparameters: {np.mean(np.array(accuracy_scores))}")
 
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
@@ -340,19 +335,66 @@ if __name__ == '__main__':
     clf = clf.fit(X, Y)
     print(tree.plot_tree(clf))
 
-    import graphviz
-
-    dot_data = tree.export_graphviz(clf, out_file=None)
-    graph = graphviz.Source(dot_data)
-    graph.render("sampled_data_1")
     dot_data = tree.export_graphviz(clf, out_file=None,
                                     feature_names=columns_to_get_mean,
                                     class_names=['popular', 'not_popular'],
                                     filled=True, rounded=True,
                                     special_characters=True)
     graph = graphviz.Source(dot_data)
+    graph.render("decision_tree")
 
-    ## K-Means Clustering: Replacing with Random Forest Classifier Soon
+    ## Basic Random Forest Classifier
+    # Create train/test sets
+    X = norm_undersampled[columns_to_get_mean]
+    Y = norm_undersampled['popularity']
+    x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+    # Define the hyperparameter space (possible values to try for each hyperparameter)
+    param_dist = {
+        'n_estimators': [x for x in range(1,11)],
+        'max_depth': [x for x in range(1,11)],
+    }
+
+    # Train a Random Forest classifier
+    # if we wanted to optimize the hyperparameters, we could use a RandomizedSearchCV
+    # just define the classifier with no hyperparameters
+    clf = RandomForestClassifier(random_state=42)
+    rand_search = RandomizedSearchCV(clf,
+                                     param_distributions=param_dist,
+                                     n_iter=3,
+                                     cv=3)
+
+    rand_search.fit(X_train, y_train)
+
+    # optimal hyperparameters
+    best = rand_search.best_estimator_
+
+    # Fit the optimal model to our training data
+    best.fit(X_train, y_train)
+
+    # Predict values of y_test on the X_test set
+    y_pred = best.predict(X_test)
+
+    # Evaluate the model's accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    classification_rep = classification_report(y_test, y_pred)
+
+    print(accuracy, "\n", classification_rep)
+
+    # Plot the decision trees
+    tree = best.estimators_[0]
+    dot_data = export_graphviz(tree, feature_names=X_train.columns,
+                               filled=True,
+                               max_depth=5,
+                               impurity=False,
+                               proportion=True)
+
+    graph = graphviz.Source(dot_data)
+    graph.render(filename="rfc")
+
+    print("How does our graph do?")
+    exit()
+
     # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
     # cont_pop_data["popularity_groups"] = pop_clusters.labels_
     #
