@@ -26,7 +26,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_predict, train_test_split, RandomizedSearchCV
-from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay, classification_report, roc_curve, roc_auc_score
+from sklearn.metrics import confusion_matrix, accuracy_score, ConfusionMatrixDisplay, classification_report, roc_curve, auc
 from sklearn.svm import SVC
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     floor_divisor = len(cleared_data[cleared_data['popularity'] == 0]) // len(cleared_data[cleared_data['popularity'] == 1])
     current_new_data = []
     for i in range(len(cleared_data[cleared_data["popularity"] == 1])):
-        current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[(i * floor_divisor) + 5])
+        current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[(i * floor_divisor)])
     undersampled_dataframe = pd.DataFrame(data=current_new_data, columns=columns_to_keep)
     all_data = undersampled_dataframe.append(cleared_data[cleared_data['popularity'] == 1])
     print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
@@ -299,20 +299,6 @@ if __name__ == '__main__':
     ax.set_ylim(0, 250)
     plt.show()
 
-    # pred = svm_classifier_poly.predict_proba(X_test)[:, 1]
-    #
-    # tpr_svm, fpr_svm, thresholds = roc_curve(y_test, pred)
-
-    # Finding the best classifier model's average accuracy of features, verified by RandomSearchCV
-    # accuracy_scores = []
-    # for _ in range(8):
-    #     svm_classifier_best = SVC(kernel='linear', degree=16, C=3)
-    #     svm_classifier_best.fit(X_train, y_train)
-    #     y_pred_best = svm_classifier_best.predict(X_test)
-    #     accuracy_scores.append(round(accuracy_score(y_test, y_pred_best), 2))
-    # avg_acc_best_svc = np.mean(np.array(accuracy_scores))
-    # print(f"Average Accuracy of Optimized Hyperparameters: {np.mean(np.array(accuracy_scores))}")
-
     # Use RandomSearchCV for remaining hyperparameters to automate
     # features = {"C": [0.5 * x for x in range(20)], "degree": [x for x in range(20)]}
     # cross_validate = RandomizedSearchCV(svm_classifier_linear, features)
@@ -387,26 +373,6 @@ if __name__ == '__main__':
     tpr_rfc, fpr_rfc, _ = roc_curve(y_test, prediction_probabilities)
 
     print("How does our XGBRFClassifier do? Pretty bad to be honest, it's about as bad as random-guessing.")
-    # pop_clusters = KMeans(n_clusters=5, max_iter=500, random_state=42).fit(cont_pop_data[['loudness', 'danceability']])
-    # cont_pop_data["popularity_groups"] = pop_clusters.labels_
-    #
-    # plt.scatter(data=unique_data, x="popularity", y="danceability", c="popularity_groups")
-    # plt.show()
-    #
-    # first_group = cont_pop_data[cont_pop_data["popularity_groups"] == 0]
-    # second_group = cont_pop_data[cont_pop_data["popularity_groups"] == 1]
-    # third_group = cont_pop_data[cont_pop_data["popularity_groups"] == 2]
-    # fourth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 3]
-    # fifth_group = cont_pop_data[cont_pop_data["popularity_groups"] == 4]
-    #
-    # fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(nrows=1, ncols=5)
-    # ax1.hist(x=first_group['popularity'], bins=8, density=True, histtype='bar')
-    # ax2.hist(x=second_group['popularity'], bins=8, density=True, histtype='bar')
-    # ax3.hist(x=third_group['popularity'], bins=8, density=True, histtype='bar')
-    # ax4.hist(x=fourth_group['popularity'], bins=8, density=True, histtype='bar')
-    # ax5.hist(x=fifth_group['popularity'], bins=8, density=True, histtype='bar')
-    # fig.tight_layout()
-    # plt.show()
 
 
     ## K-Nearest-Neighbors: Fit adequately for model
@@ -523,6 +489,8 @@ if __name__ == '__main__':
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
     #disp.plot()
 
+
+    ## Comparing effectivity of different classifiers
     # We can collect each of the accuracy metrics and plot them on a scatterplot, along with
     # an expected ROC curve value and an identity line. This will show how each of them
     # matches in terms or effectivity of the positive class, and the overall accuracy of the
@@ -544,13 +512,18 @@ if __name__ == '__main__':
     svm_pred = svm_classifier_poly.decision_function(X_test)
     tpr_svm, fpr_svm, _ = roc_curve(y_test, svm_pred)
 
+    # Find Area Under the Curve values for each of the classifiers
+    auc_svm = auc(tpr_svm, fpr_svm)
+    auc_decision_tree = auc(tpr_decision_tree, fpr_decision_tree)
+    auc_rfc = auc(tpr_rfc, fpr_rfc)
+    auc_knn = auc(tpr_knn, fpr_knn)
 
-    # Plotting Layered ROC curves for each of the machine learning models
+    # Plotting Layered ROC curves for each of the machine learning models, with Area Under the Curve Metric for each
     plt.plot([0, 1], [0, 1], '--', color='red', label='Random Guessing')
-    plt.plot(tpr_svm, fpr_svm, color='cadetblue', label='SVM with Polynomial Kernel')
-    plt.plot(tpr_decision_tree, fpr_decision_tree, color='deepskyblue', label='Decision Tree')
-    plt.plot(tpr_rfc, fpr_rfc, color='aqua', label='XGBoost Random Forest Classifier')
-    plt.plot(tpr_knn, fpr_knn, color='darkcyan', label='K-Nearest-Neighbors')
+    plt.plot(tpr_svm, fpr_svm, color='cadetblue', label=f'SVM Poly Kernel  AUC={round(auc_svm, 2)}')
+    plt.plot(tpr_decision_tree, fpr_decision_tree, color='deepskyblue', label=f'Decision Tree  AUC={round(auc_decision_tree, 2)}')
+    plt.plot(tpr_rfc, fpr_rfc, color='aqua', label=f'XGBoost Random Forest Classifier  AUC={round(auc_rfc, 2)}')
+    plt.plot(tpr_knn, fpr_knn, color='darkcyan', label=f'K-Nearest-Neighbors  AUC={round(auc_knn, 2)}')
     plt.title("ROC Curve Comparison between all tested Machine Learning Models")
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
