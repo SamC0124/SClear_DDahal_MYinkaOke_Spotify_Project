@@ -366,8 +366,8 @@ if __name__ == '__main__':
     # report performance
     print('Mean Accuracy: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
     model.fit(X_train, y_train)
-    plot_tree(model)
-    plt.show()
+    # plot_tree(model)
+    # plt.show()
 
     prediction_probabilities = model.predict_proba(X_test)[:, 0]
     tpr_rfc, fpr_rfc, _ = roc_curve(y_test, prediction_probabilities)
