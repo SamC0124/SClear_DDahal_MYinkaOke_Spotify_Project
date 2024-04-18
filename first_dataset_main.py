@@ -97,6 +97,7 @@ if __name__ == '__main__':
     #cleared_data.info()
 
     ## Prior Graphing, Gathering Insights
+<<<<<<< HEAD
     # Computing correlations of data with the highest popularity value
     '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
     * also if we want we can increase the number of popularity for better accuracy'''
@@ -124,6 +125,37 @@ if __name__ == '__main__':
     plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
     plt.close()
     print(average_data)
+=======
+    # Computing correlations of data with highest popularity value
+    # '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
+    # * also if we want we can increase the number of popularity for better accuracy'''
+    # pop_data = music_data[music_data['popularity'] > 75]
+    # pop_columns = ['artists', 'album_name', 'track_name', 'popularity', 'duration_ms', 'explicit', 'danceability',
+    #                'energy',
+    #                'key', 'loudness', 'mode', 'speechiness', 'acousticness', 'instrumentalness', 'liveness', 'valence',
+    #                'tempo',
+    #                'time_signature', 'track_genre']
+    # plt.imshow(pop_data.corr(), cmap="PuBu")
+    # plt.xticks(ticks=range(len(pop_columns)), labels=pop_columns, rotation=90)
+    # plt.yticks(ticks=range(len(pop_columns)), labels=pop_columns)
+    # plt.title("Correlations between Characteristics of Songs with High Popularities")
+    # plt.tight_layout()
+    # plt.colorbar()
+    # plt.close()
+
+    # # Calculate average of specified columns, which we can use to predict the popularity of a song
+    # average_data = pop_data[
+    #     ['duration_ms', 'danceability', 'energy', 'loudness', 'speechiness', 'acousticness', 'instrumentalness',
+    #      'liveness', 'valence', 'tempo', 'time_signature']].mean()
+    #
+    # # Compare popularity to another characteristic
+    # plt.scatter(data=pop_data, x='duration_ms', y='popularity')
+    # plt.ylabel("Popularity Score of Song (0 to 1)")
+    # plt.xlabel("Duration of the Song (Milliseconds)")
+    # plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
+    # plt.close()
+    # print(average_data)
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
 
     ## Under-sampling the negative class for the data, picking from equal portions of the data throughout.
     print(f"Positive Class: {len(cleared_data[cleared_data['popularity'] == 1])}, Negative Class: {len(cleared_data[cleared_data['popularity'] == 0])}")
@@ -132,7 +164,7 @@ if __name__ == '__main__':
     for i in range(len(cleared_data[cleared_data["popularity"] == 1])):
         current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[(i * floor_divisor)])
     undersampled_dataframe = pd.DataFrame(data=current_new_data, columns=columns_to_keep)
-    all_data = undersampled_dataframe.append(cleared_data[cleared_data['popularity'] == 1])
+    all_data = undersampled_dataframe._append(cleared_data[cleared_data['popularity'] == 1]) #TODO this was changed
     print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
     print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'.")
 
@@ -199,7 +231,24 @@ if __name__ == '__main__':
         accuracies_sigmoid.append(accuracy_score(y_test, y_pred_sigmoid))
         accuracies_rbf.append(accuracy_score(y_test, y_pred_rbf))
 
+<<<<<<< HEAD
     # Last iteration occurs outside the loop for graphing purposes
+=======
+        from scipy.stats import wilcoxon, ranksums
+
+    stat_linear_poly, p_value_linear_poly = wilcoxon(accuracies_linear, accuracies_poly)
+    stat_linear_sigmoid, p_value_linear_sigmoid = wilcoxon(accuracies_linear, accuracies_sigmoid)
+    stat_linear_rbf, p_value_linear_rbf = wilcoxon(accuracies_linear, accuracies_rbf)
+    stat_linear_sgd, p_value_linear_sgd = wilcoxon(accuracies_linear, accuracies_sgd)
+
+    print("Wilcoxon signed-rank test p-values:")
+    print("Linear vs Polynomial:", p_value_linear_poly)
+    print("Linear vs Sigmoid:", p_value_linear_sigmoid)
+    print("Linear vs RBF:", p_value_linear_rbf)
+    print("Linear vs SGD:", p_value_linear_sgd)
+
+    # Last iteration occurs outside of the loop for graphing purposes
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
     # Train the classifiers
     print("Training classifiers...")
     svm_classifier_linear.fit(X_train, y_train)
@@ -293,10 +342,13 @@ if __name__ == '__main__':
     plt.show()
 
 
+
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
     # This Decision Tree Classifier Program was adapted from the following site:
     # https://scikit-learn.org/stable/modules/tree.html
+    np.random.seed(42)
+
     X = norm_undersampled[columns_to_get_mean]
     Y = norm_undersampled['popularity']
 
@@ -304,15 +356,15 @@ if __name__ == '__main__':
 
     clf = tree.DecisionTreeClassifier()
     clf = clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
-    decision_tree_matrix = confusion_matrix(y_test, y_pred)
+    y_pred_tree = clf.predict(X_test)
+    decision_tree_matrix = confusion_matrix(y_test, y_pred_tree)
     dot_data = tree.export_graphviz(clf, out_file=None,
                                     feature_names=columns_to_get_mean,
                                     class_names=['popular', 'not_popular'],
                                     filled=True, rounded=True,
                                     special_characters=True)
     graph = graphviz.Source(dot_data)
-    graph.render("decision_tree")
+    # graph.render("decision_tree")
 
     pred_decision_tree = clf.predict_proba(X_test)[:, 0]
 
@@ -322,6 +374,8 @@ if __name__ == '__main__':
     ## XGBoosted Random Forest Classifier
     # How can we boost this RFC model?
     # Create train/test sets
+    np.random.seed(42)
+
     X = norm_undersampled[columns_to_get_mean]
     Y = norm_undersampled['popularity']
     x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
@@ -336,6 +390,15 @@ if __name__ == '__main__':
     # if we wanted to optimize the hyperparameters, we could use a RandomizedSearchCV
     # just define the classifier with no hyperparameters
 
+<<<<<<< HEAD
+=======
+    from numpy import mean
+    from numpy import std
+    from sklearn.model_selection import cross_val_score
+    from sklearn.model_selection import RepeatedStratifiedKFold
+    from xgboost import XGBRFClassifier
+
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
     # define the model
     modelxgb = XGBRFClassifier(n_estimators=100, subsample=0.9, colsample_bynode=0.2)
     # define the model evaluation procedure
@@ -344,17 +407,18 @@ if __name__ == '__main__':
     n_scores = cross_val_score(modelxgb, X, Y, scoring='accuracy', cv=cv, n_jobs=-1)
     # report performance
     print('Mean Accuracy: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+<<<<<<< HEAD
     modelxgb.fit(X_train, y_train)
-    # plot_tree(model)
-    # plt.show()
+=======
+    model.fit(X_train, y_train)
+    y_pred_xgboost = model.predict(X_test)
 
-    # Return the performance metrics for the model, to analyze later
-    prediction_probabilities = modelxgb.predict_proba(X_test)[:, 0]
-    tpr_rfc, fpr_rfc, _ = roc_curve(y_test, prediction_probabilities)
-    y_pred_xgboost = modelxgb.predict(X_test)
+
+
+
 
     # Get feature importances
-    importances = modelxgb.feature_importances_
+    importances = model.feature_importances_
 
     # Sort feature importances in descending order
     indices = np.argsort(importances)[::-1]
@@ -365,6 +429,37 @@ if __name__ == '__main__':
         feature_index = indices[f]
         feature_name = X_train.columns[feature_index]
         print(f"{f + 1}. Feature '{feature_name}' ({importances[feature_index]})")
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+    # plot_tree(model)
+    # plt.show()
+
+    # Return the performance metrics for the model, to analyze later
+    prediction_probabilities = modelxgb.predict_proba(X_test)[:, 0]
+    tpr_rfc, fpr_rfc, _ = roc_curve(y_test, prediction_probabilities)
+    y_pred_xgboost = modelxgb.predict(X_test)
+
+<<<<<<< HEAD
+    # Get feature importances
+    importances = modelxgb.feature_importances_
+=======
+
+    print("How does our XGBRFClassifier do? Pretty bad to be honest, it's about as bad as random-guessing.")
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
+    # Sort feature importances in descending order
+    indices = np.argsort(importances)[::-1]
+
+<<<<<<< HEAD
+    # Print feature ranking
+    print("Feature ranking:")
+    for f in range(X_train.shape[1]):
+        feature_index = indices[f]
+        feature_name = X_train.columns[feature_index]
+        print(f"{f + 1}. Feature '{feature_name}' ({importances[feature_index]})")
+=======
+
+    ## K-Nearest-Neighbors: Fit adequately for model
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
 
 
     ## K-Nearest-Neighbors: Fit adequately for model
@@ -433,12 +528,19 @@ if __name__ == '__main__':
 
     # Ensure 'popularity' is included in pop_norm
     pop_norm['popularity'] = cleared_data['popularity']
+<<<<<<< HEAD
 
     # Splitting data into features (X) and target (y) from undersampled data
+=======
+    np.random.seed(42)
+
+    # Splitting data into features (X) and target (y)
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
     X = pop_norm.drop(columns=['popularity'])
     y = pop_norm['popularity']
 
     # Splitting data into train and test sets
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
     # Initializing KNN classifier
@@ -446,6 +548,7 @@ if __name__ == '__main__':
 
     # Fitting the classifier on the training data
     knn_classifier.fit(X_train, y_train)
+<<<<<<< HEAD
 
     # Predicting on the test data
     y_pred_knn = knn_classifier.predict(X_test)
@@ -460,6 +563,32 @@ if __name__ == '__main__':
 
     # Displaying confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
+=======
+    # Predicting on the test data
+    y_pred_knn = knn_classifier.predict(X_test)
+    pred = knn_classifier.predict_proba(X_test)[:, 1]
+
+    tpr_knn, fpr_knn, thresholds = roc_curve(y_test, pred)
+    # Perform cross-validation to obtain accuracy scores for KNN and polynomial logistic regression
+    accuracies_knn = cross_val_score(knn_classifier, X_train, y_train, cv=5, scoring='accuracy')
+
+
+    Pvalue1 = ranksums(y_pred_knn, y_pred_tree)
+    Pvalue2 = ranksums(y_pred_knn, y_pred_xgboost)
+    # Pvalue3 = ranksums(y_pred_tree, y_pred_xgboost)
+
+    print("P-value for KNN and Tree", Pvalue1, "\n\n\n\n")
+    print("P-value for KNN and xgBoost", Pvalue2, "\n\n\n\n\n")
+    # print("P-value for tree and xgBoost", Pvalue3, "\n\n\n\n\n")
+
+    # # Calculating confusion matrix
+    cm = confusion_matrix(y_test, y_pred_knn)
+    # # Displaying confusion matrix
+    # disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
+    #disp.plot()
+
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
 
     ## Comparing effectivity of different classifiers
     # We can collect each of the accuracy metrics and plot them on a scatterplot, along with
@@ -474,7 +603,11 @@ if __name__ == '__main__':
     svm_tn = poly_tn
     svm_fn = poly_fn
     decision_tree_tn, decision_tree_fp, decision_tree_fn, decision_tree_tp = decision_tree_matrix.ravel()
+<<<<<<< HEAD
     rfc_tn, rfc_fp, rfc_fn, rfc_tp = confusion_matrix(y_test, y_pred_xgboost).ravel()
+=======
+    rfc_tn, rfc_fp, rfc_fn, rfc_tp = confusion_matrix(y_test, y_pred_knn).ravel()
+>>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
     knn_tn, knn_fp, knn_fn, knn_tp = cm.ravel()
 
     # Finding probabilities of SVM classifier
