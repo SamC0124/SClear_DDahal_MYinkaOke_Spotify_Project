@@ -16,6 +16,7 @@ import seaborn as sns
 import string
 import sklearn as sk
 import xgboost
+from cffi import model
 from scipy.stats import ranksums
 from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -97,7 +98,6 @@ if __name__ == '__main__':
     #cleared_data.info()
 
     ## Prior Graphing, Gathering Insights
-<<<<<<< HEAD
     # Computing correlations of data with the highest popularity value
     '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
     * also if we want we can increase the number of popularity for better accuracy'''
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
     plt.close()
     print(average_data)
-=======
+
     # Computing correlations of data with highest popularity value
     # '''we consider a song is popular if it's popularity determined by the number of time it was played is greater than 75
     # * also if we want we can increase the number of popularity for better accuracy'''
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     # plt.title("Comparing popularity of song to Duration (To be deprecated to scatterplot graph in final document)")
     # plt.close()
     # print(average_data)
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
 
     ## Under-sampling the negative class for the data, picking from equal portions of the data throughout.
     print(f"Positive Class: {len(cleared_data[cleared_data['popularity'] == 1])}, Negative Class: {len(cleared_data[cleared_data['popularity'] == 0])}")
@@ -231,9 +231,8 @@ if __name__ == '__main__':
         accuracies_sigmoid.append(accuracy_score(y_test, y_pred_sigmoid))
         accuracies_rbf.append(accuracy_score(y_test, y_pred_rbf))
 
-<<<<<<< HEAD
+
     # Last iteration occurs outside the loop for graphing purposes
-=======
         from scipy.stats import wilcoxon, ranksums
 
     stat_linear_poly, p_value_linear_poly = wilcoxon(accuracies_linear, accuracies_poly)
@@ -248,7 +247,7 @@ if __name__ == '__main__':
     print("Linear vs SGD:", p_value_linear_sgd)
 
     # Last iteration occurs outside of the loop for graphing purposes
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
     # Train the classifiers
     print("Training classifiers...")
     svm_classifier_linear.fit(X_train, y_train)
@@ -390,15 +389,13 @@ if __name__ == '__main__':
     # if we wanted to optimize the hyperparameters, we could use a RandomizedSearchCV
     # just define the classifier with no hyperparameters
 
-<<<<<<< HEAD
-=======
     from numpy import mean
     from numpy import std
     from sklearn.model_selection import cross_val_score
     from sklearn.model_selection import RepeatedStratifiedKFold
     from xgboost import XGBRFClassifier
 
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
     # define the model
     modelxgb = XGBRFClassifier(n_estimators=100, subsample=0.9, colsample_bynode=0.2)
     # define the model evaluation procedure
@@ -407,14 +404,10 @@ if __name__ == '__main__':
     n_scores = cross_val_score(modelxgb, X, Y, scoring='accuracy', cv=cv, n_jobs=-1)
     # report performance
     print('Mean Accuracy: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
-<<<<<<< HEAD
+
     modelxgb.fit(X_train, y_train)
-=======
     model.fit(X_train, y_train)
     y_pred_xgboost = model.predict(X_test)
-
-
-
 
 
     # Get feature importances
@@ -429,7 +422,7 @@ if __name__ == '__main__':
         feature_index = indices[f]
         feature_name = X_train.columns[feature_index]
         print(f"{f + 1}. Feature '{feature_name}' ({importances[feature_index]})")
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
     # plot_tree(model)
     # plt.show()
 
@@ -438,28 +431,27 @@ if __name__ == '__main__':
     tpr_rfc, fpr_rfc, _ = roc_curve(y_test, prediction_probabilities)
     y_pred_xgboost = modelxgb.predict(X_test)
 
-<<<<<<< HEAD
+
     # Get feature importances
     importances = modelxgb.feature_importances_
-=======
+
 
     print("How does our XGBRFClassifier do? Pretty bad to be honest, it's about as bad as random-guessing.")
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
 
     # Sort feature importances in descending order
     indices = np.argsort(importances)[::-1]
 
-<<<<<<< HEAD
     # Print feature ranking
     print("Feature ranking:")
     for f in range(X_train.shape[1]):
         feature_index = indices[f]
         feature_name = X_train.columns[feature_index]
         print(f"{f + 1}. Feature '{feature_name}' ({importances[feature_index]})")
-=======
+
 
     ## K-Nearest-Neighbors: Fit adequately for model
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
 
 
     ## K-Nearest-Neighbors: Fit adequately for model
@@ -528,14 +520,13 @@ if __name__ == '__main__':
 
     # Ensure 'popularity' is included in pop_norm
     pop_norm['popularity'] = cleared_data['popularity']
-<<<<<<< HEAD
 
     # Splitting data into features (X) and target (y) from undersampled data
-=======
+
     np.random.seed(42)
 
     # Splitting data into features (X) and target (y)
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
     X = pop_norm.drop(columns=['popularity'])
     y = pop_norm['popularity']
 
@@ -548,7 +539,6 @@ if __name__ == '__main__':
 
     # Fitting the classifier on the training data
     knn_classifier.fit(X_train, y_train)
-<<<<<<< HEAD
 
     # Predicting on the test data
     y_pred_knn = knn_classifier.predict(X_test)
@@ -563,7 +553,6 @@ if __name__ == '__main__':
 
     # Displaying confusion matrix
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
-=======
     # Predicting on the test data
     y_pred_knn = knn_classifier.predict(X_test)
     pred = knn_classifier.predict_proba(X_test)[:, 1]
@@ -587,7 +576,7 @@ if __name__ == '__main__':
     # disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=knn_classifier.classes_)
     #disp.plot()
 
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
 
 
     ## Comparing effectivity of different classifiers
@@ -603,11 +592,11 @@ if __name__ == '__main__':
     svm_tn = poly_tn
     svm_fn = poly_fn
     decision_tree_tn, decision_tree_fp, decision_tree_fn, decision_tree_tp = decision_tree_matrix.ravel()
-<<<<<<< HEAD
+
     rfc_tn, rfc_fp, rfc_fn, rfc_tp = confusion_matrix(y_test, y_pred_xgboost).ravel()
-=======
+
     rfc_tn, rfc_fp, rfc_fn, rfc_tp = confusion_matrix(y_test, y_pred_knn).ravel()
->>>>>>> 7bdb25f2e77a01bf04e3b096edefc6a96b706581
+
     knn_tn, knn_fp, knn_fn, knn_tp = cm.ravel()
 
     # Finding probabilities of SVM classifier
