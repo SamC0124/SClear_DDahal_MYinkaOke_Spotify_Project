@@ -178,8 +178,6 @@ if __name__ == '__main__':
 
 
     ## SVM with Soft Margin (Allow for missclassification at a low cost, essential for our imperfect dataset)
-    ## The very initial version of this file was constructed with the support of ChatGPT, but has been built
-    ## up significantly since then.
 
     # Generate noisy data
     X = norm_undersampled[columns_to_get_mean]
@@ -345,7 +343,7 @@ if __name__ == '__main__':
     ## Decision Tree Modeling
     # First Decision Tree Model - All features
     # This Decision Tree Classifier Program was adapted from the following site:
-    # https://scikit-learn.org/stable/modules/tree.html
+    # s://scikit-learn.org/stable/modules/tree.html
     np.random.seed(42)
 
     X = norm_undersampled[columns_to_get_mean]
@@ -448,10 +446,6 @@ if __name__ == '__main__':
         feature_index = indices[f]
         feature_name = X_train.columns[feature_index]
         print(f"{f + 1}. Feature '{feature_name}' ({importances[feature_index]})")
-
-
-    ## K-Nearest-Neighbors: Fit adequately for model
-
 
 
     ## K-Nearest-Neighbors: Fit adequately for model
