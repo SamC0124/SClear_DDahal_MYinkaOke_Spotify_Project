@@ -164,7 +164,7 @@ if __name__ == '__main__':
     for i in range(len(cleared_data[cleared_data["popularity"] == 1])):
         current_new_data.append(cleared_data[cleared_data['popularity'] == 0].iloc[(i * floor_divisor)])
     undersampled_dataframe = pd.DataFrame(data=current_new_data, columns=columns_to_keep)
-    all_data = undersampled_dataframe._append(cleared_data[cleared_data['popularity'] == 1]) #TODO this was changed
+    all_data = pd.concat(undersampled_dataframe, cleared_data[cleared_data['popularity'] == 1])
     print(f"New Positive Class Size: {len(all_data[all_data['popularity'] == 1])}, Negative Class Size: {len(all_data[all_data['popularity'] == 0])}")
     print("Data should now be balanced, however a large amount of data was lost. We may decrease the minimum popularity score needed to be labeled \'popular\'.")
 
@@ -404,12 +404,11 @@ if __name__ == '__main__':
     print('Mean Accuracy: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
 
     modelxgb.fit(X_train, y_train)
-    model.fit(X_train, y_train)
-    y_pred_xgboost = model.predict(X_test)
+    y_pred_xgboost = modelxgb.predict(X_test)
 
 
     # Get feature importances
-    importances = model.feature_importances_
+    importances = modelxgb.feature_importances_
 
     # Sort feature importances in descending order
     indices = np.argsort(importances)[::-1]
